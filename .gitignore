@@ -1,0 +1,41 @@
+# ---- Built locally (large, machine-specific) -------------------------------------------
+# Portable Python environment and its download cache: run build_usb_env.cmd after cloning.
+/python_env/
+/wheelhouse/
+# Packed environment archive made by prepare_usb.cmd (~2.5 GB, cached between runs)
+/dist/
+# What prepare_usb.cmd puts on the stick, if you point it at a folder inside the repo
+/payload/
+/datasets/
+*.partial
+
+# ---- Runtime state ----------------------------------------------------------------------
+/logs/
+# The worker remembers the last Master IP here
+.env
+.env.*
+!.env.example
+
+# ---- Python ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# ---- Frontend (Next.js) ----------------------------------------------------------------
+# master/dashboard/ (the static build) IS committed, so nobody needs Node.js to run TensorSwarm.
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.api-parked/
+frontend/*.tsbuildinfo
+frontend/.env*.local
+npm-debug.log*
+
+# ---- OS / editors ----------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp

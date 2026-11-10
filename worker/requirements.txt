@@ -1,0 +1,6 @@
+nvidia-ml-py>=12.535.133
+psutil>=5.9.8
+requests>=2.31.0
+ray[default]==2.35.0
+# Ray 2.35 CLI ("ray start") crashes with click>=8.3: "ValueError: ... is not a valid Sentinel"
+click>=8.1,<8.3

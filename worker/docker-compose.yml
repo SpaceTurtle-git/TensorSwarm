@@ -1,0 +1,26 @@
+services:
+  ray-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tensorswarm-worker:latest
+    container_name: tensorswarm_worker
+    restart: unless-stopped
+    network_mode: "host"
+    ipc: "host"
+    environment:
+      - MASTER_TAILSCALE_IP=${MASTER_TAILSCALE_IP:-100.120.6.34}
+      - WORKER_TAILSCALE_IP=${WORKER_TAILSCALE_IP}
+      - MASTER_PORT=${MASTER_PORT:-8000}
+      - HEARTBEAT_INTERVAL=5
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - ./entrypoint.sh:/app/entrypoint.sh:ro
+      - ./agent.py:/app/agent.py:ro
+    command: ["/bin/bash", "/app/entrypoint.sh"]

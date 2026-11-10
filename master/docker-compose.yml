@@ -1,0 +1,64 @@
+services:
+  # ============================================================================
+  # 1. Ray Head + Local GPU Worker + Master Telemetry Agent
+  # ============================================================================
+  ray-master:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tensorswarm-master:latest
+    container_name: tensorswarm_ray_master
+    restart: unless-stopped
+    network_mode: "host"
+    ipc: "host"
+    environment:
+      - MASTER_TAILSCALE_IP=${MASTER_TAILSCALE_IP:-100.120.6.34}
+      - WORKER_TAILSCALE_IP=${MASTER_TAILSCALE_IP:-100.120.6.34}
+      - MASTER_PORT=8000
+      - HEARTBEAT_INTERVAL=5
+      - PYTHONPATH=/app
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - ./entrypoint.sh:/app/entrypoint.sh:ro
+      - ./server.py:/app/server.py:ro
+      - ./agent.py:/app/agent.py:ro
+      - ray-session:/tmp/ray
+    command: ["/bin/bash", "/app/entrypoint.sh"]
+
+  # ============================================================================
+  # 2. FastAPI Backend & Job Dispatch API
+  # ============================================================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tensorswarm-master:latest
+    container_name: tensorswarm_backend
+    restart: unless-stopped
+    network_mode: "host"
+    ipc: "host"
+    depends_on:
+      - ray-master
+    environment:
+      - MASTER_TAILSCALE_IP=${MASTER_TAILSCALE_IP:-100.120.6.34}
+      - HOST=0.0.0.0
+      - PORT=8000
+      - PYTHONPATH=/app
+      - TENSORSWARM_DATA_DIR=/data/datasets
+    volumes:
+      - ./server.py:/app/server.py:ro
+      - ./datasets_api.py:/app/datasets_api.py:ro
+      - ./tensorswarm_client.py:/app/tensorswarm_client.py:ro
+      - ray-session:/tmp/ray
+      - datasets:/data/datasets      # the Master's dataset store survives container rebuilds
+    command: ["/bin/bash", "-c", "sleep 3 && uvicorn server:app --app-dir /app --host 0.0.0.0 --port 8000"]
+
+volumes:
+  datasets:
+  ray-session:

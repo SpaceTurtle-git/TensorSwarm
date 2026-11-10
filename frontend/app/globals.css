@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* The dashboard is dark-only. Chart colors are role tokens (dark-mode steps of the
+   validated reference palette); status colors are reserved for state and always ship
+   with an icon + label. */
+:root {
+  color-scheme: dark;
+  --viz-surface: #0f172a;      /* slate-900: chart card surface */
+  --viz-series: #3987e5;       /* single-series blue (dark step) */
+  --viz-grid: rgba(148, 163, 184, 0.14);
+  --viz-axis: #64748b;
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #020617; /* slate-950 */
+}
+
+/* CodeMirror inside notebook cells */
+.cell-editor .cm-editor {
+  background: transparent;
+  font-size: 13px;
+}
+.cell-editor .cm-editor.cm-focused {
+  outline: none;
+}
+.cell-editor .cm-scroller {
+  font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+  line-height: 1.55;
+}
+.cell-editor .cm-gutters {
+  background: transparent;
+  border-right: none;
+  color: #475569;
+}
+.cell-editor .cm-activeLine,
+.cell-editor .cm-activeLineGutter {
+  background: rgba(148, 163, 184, 0.06);
+}
+
+/* Rendered markdown cells */
+.md-cell h1 { font-size: 1.5rem; font-weight: 600; margin: 0.4rem 0 0.6rem; color: #f8fafc; }
+.md-cell h2 { font-size: 1.2rem; font-weight: 600; margin: 0.4rem 0 0.5rem; color: #f1f5f9; }
+.md-cell h3 { font-size: 1.05rem; font-weight: 600; margin: 0.3rem 0 0.4rem; color: #e2e8f0; }
+.md-cell p { margin: 0.35rem 0; line-height: 1.6; }
+.md-cell ul { list-style: disc; padding-left: 1.4rem; margin: 0.35rem 0; }
+.md-cell ol { list-style: decimal; padding-left: 1.4rem; margin: 0.35rem 0; }
+.md-cell code { background: #1e293b; padding: 0.1rem 0.35rem; border-radius: 0.25rem; font-size: 0.85em; color: #a5f3fc; }
+.md-cell pre { background: #0b1220; padding: 0.6rem 0.8rem; border-radius: 0.4rem; overflow-x: auto; }
+.md-cell pre code { background: none; padding: 0; }
+.md-cell a { color: #7dd3fc; text-decoration: underline; }
+.md-cell table { border-collapse: collapse; margin: 0.5rem 0; }
+.md-cell th, .md-cell td { border: 1px solid #334155; padding: 0.25rem 0.6rem; }
+.md-cell blockquote { border-left: 3px solid #334155; padding-left: 0.8rem; color: #94a3b8; }
+
+/* Thin scrollbars for output areas */
+.thin-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.thin-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+.thin-scroll::-webkit-scrollbar-track { background: transparent; }
