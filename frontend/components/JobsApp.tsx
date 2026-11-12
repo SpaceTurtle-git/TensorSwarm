@@ -162,38 +162,38 @@ export default function JobsApp() {
       {/* ---------------------------------------------------------------- samples */}
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-fg">Sample scripts for testing worker nodes</h2>
+          <h2 className="text-[20px] font-semibold tracking-[-0.01em] text-fg">Sample scripts for testing worker nodes</h2>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] text-muted">Run on</span>
+            <span className="text-[12px] font-medium text-muted">Run on</span>
             <TargetSelect value={target} onChange={setTarget} share={share} />
             <ShareSelect value={share} onChange={setShare} />
             <CoresSelect value={cores} onChange={setCores} />
           </div>
         </div>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1.5">
           {categories.map((c) => (
-            <button key={c} onClick={() => setCategory(c)}
-              className={`rounded-full px-3 py-1 text-xs ${category === c ? "bg-fg font-medium text-canvas" : "bg-surface text-muted hover:text-fg"}`}>
+            <button key={c} onClick={() => setCategory(c)} aria-pressed={category === c}
+              className={`rounded-full border px-3.5 py-1.5 text-[12.5px] font-medium transition-colors duration-150 ${category === c ? "border-accent bg-accent text-accent-fg" : "border-line bg-elevated/70 text-muted hover:border-line-strong hover:text-fg"}`}>
               {c}
             </button>
           ))}
         </div>
         {samplesError && <p className="text-xs text-danger-fg">Could not load samples: {samplesError}</p>}
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {shown.map((s: Sample) => (
-            <Card key={s.id} className="flex flex-col p-4">
-              <div className="flex items-baseline justify-between gap-2">
-                <h3 className="text-sm font-semibold text-fg">{s.title}</h3>
-                <span className="shrink-0 rounded bg-elevated px-1.5 py-0.5 text-[10px] text-muted">{s.category}</span>
+            <Card key={s.id} className="flex flex-col p-5 transition-[border-color] duration-150 hover:border-line-strong">
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="text-[15.5px] font-semibold leading-snug text-fg">{s.title}</h3>
+                <span className="shrink-0 rounded-full border border-line bg-elevated px-2 py-0.5 text-[11px] font-medium text-muted">{s.category}</span>
               </div>
-              <p className="mt-1 flex-1 text-xs leading-relaxed text-muted">{s.description}</p>
-              <div className="mt-2 text-[10.5px] text-muted">{s.runtime}{s.gpu === "required" ? " · needs a GPU" : ""}</div>
-              <div className="mt-3 flex gap-2">
-                <Link href={`/notebook?sample=${encodeURIComponent(s.id)}`} className="inline-flex items-center rounded-lg bg-elevated px-3 py-1.5 text-xs font-medium text-fg hover:bg-line">
+              <p className="mt-2 flex-1 text-[13px] leading-relaxed text-muted">{s.description}</p>
+              <div className="mt-3 text-[12px] text-muted tabular">{s.runtime}{s.gpu === "required" ? " · needs a GPU" : ""}</div>
+              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line/70 pt-3">
+                <Link href={`/notebook?sample=${encodeURIComponent(s.id)}`} className="inline-flex min-h-[34px] items-center rounded-lg border border-line bg-elevated px-3 py-1.5 text-[13px] font-medium text-fg transition-colors duration-150 hover:border-line-strong">
                   Open in notebook
                 </Link>
                 {s.mode === "notebook" ? (
-                  <span className="self-center text-[10.5px] text-muted">notebook only (uses ! shell lines)</span>
+                  <span className="text-[12px] text-muted">notebook only (uses ! shell lines)</span>
                 ) : (
                   <Button variant="primary" onClick={() => submit(s.code, s.title, target, share)}
                     title={s.gpu === "required" && share === 0 ? "This sample needs a GPU: choose a GPU share" : undefined}>
@@ -207,11 +207,11 @@ export default function JobsApp() {
       </section>
 
       {/* ---------------------------------------------------------------- custom script */}
-      <Card className="p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+      <Card className="p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold text-fg">Batch script</h2>
-            <p className="text-[11px] text-muted">Runs top to bottom on one worker. Set a variable named <code>result</code> to return a value.</p>
+            <h2 className="text-[17px] font-semibold text-fg">Batch script</h2>
+            <p className="mt-0.5 text-[12.5px] text-muted">Runs top to bottom on one worker. Set a variable named <code>result</code> to return a value.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <TargetSelect value={target} onChange={setTarget} share={share} />
@@ -220,22 +220,22 @@ export default function JobsApp() {
             <Button variant="primary" onClick={() => submit(script, "batch_script", target, share)}>Run (Ctrl+Enter)</Button>
           </div>
         </div>
-        <div className="mt-3 rounded-lg border border-line bg-canvas/60">
+        <div className="mt-4 rounded-xl border border-line bg-elevated">
           <CodeEditor value={script} onChange={setScript} minHeight="160px" onRun={() => submit(script, "batch_script", target, share)} />
         </div>
       </Card>
 
       {/* ---------------------------------------------------------------- history */}
-      <Card className="p-4">
-        <h2 className="text-sm font-semibold text-fg">Job history</h2>
+      <Card className="p-5">
+        <h2 className="text-[17px] font-semibold text-fg">Job history</h2>
         {jobs.length === 0 ? (
-          <p className="mt-2 text-xs text-muted">No jobs yet (the Master keeps them in memory until it restarts).</p>
+          <p className="mt-2 text-[13px] text-muted">No jobs yet (the Master keeps them in memory until it restarts).</p>
         ) : (
           <div className="mt-2 divide-y divide-line/70">
             {jobs.map((j) => (
               <div key={j.job_id}>
                 <button onClick={() => setOpen(open === j.job_id ? null : j.job_id)}
-                  className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 py-2 text-left text-xs hover:bg-elevated/20">
+                  className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 rounded-lg px-2 py-2.5 text-left text-[12.5px] transition-colors duration-150 hover:bg-elevated/60">
                   <StatusPill status={j.status} />
                   <span className="font-medium text-fg">{j.job_name}</span>
                   <span className="font-mono text-muted">{j.job_id}</span>

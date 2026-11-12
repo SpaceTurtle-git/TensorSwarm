@@ -66,7 +66,7 @@ export default function Workloads({ items }: { items: Workload[] }) {
                 {w.status === "failed" && w.error && <p className="mt-1.5 line-clamp-2 text-[12px] text-danger-fg">{w.error}</p>}
               </>
             );
-            const cls = `block rounded-xl border border-line bg-surface/60 px-3.5 py-3 transition-[background-color,border-color] duration-[180ms] ${w.mine ? "ring-1 ring-accent/40" : ""}`;
+            const cls = `block rounded-xl border border-line glass px-3.5 py-3 transition-[background-color,border-color] duration-[180ms] ${w.mine ? "ring-1 ring-accent/40" : ""}`;
             return (
               <li key={w.id}>
                 {href ? <Link href={href} className={`${cls} hover:border-line-strong hover:bg-surface`}>{body}</Link> : <div className={cls}>{body}</div>}

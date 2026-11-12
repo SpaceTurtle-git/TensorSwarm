@@ -72,7 +72,7 @@ export default function DatasetsApp() {
         <div className="space-y-3">
           {datasets === null && !error && <p className="text-sm text-muted">Loading…</p>}
           {datasets?.length === 0 && (
-            <Card className="p-8 text-center text-sm text-muted">
+            <Card className="border-dashed p-8 text-center text-sm text-muted">
               No datasets yet. Upload files or a folder on the right, import one from a URL, or put big ones on the USB stick
               (<code className="text-fg/85">prepare_usb.cmd -Datasets name</code>).
             </Card>
@@ -281,16 +281,16 @@ function UploadPanel({ existing, onDone }: { existing: Set<string>; onDone: () =
   const pct = prog && prog.total ? Math.min(100, (100 * prog.sent) / prog.total) : 0;
 
   return (
-    <Card className="p-4">
-      <h2 className="text-sm font-semibold text-fg">Upload a dataset</h2>
+    <Card className="p-5">
+      <h2 className="text-[16px] font-semibold text-fg">Upload a dataset</h2>
       <div
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={async (e) => { e.preventDefault(); setDragging(false); if (!uploading) pick(await filesFromDrop(e.dataTransfer)); }}
-        className={`mt-3 rounded-lg border-2 border-dashed px-3 py-5 text-center text-xs transition-colors ${dragging ? "border-accent bg-accent/5 text-fg" : "border-line-strong text-muted"}`}
+        className={`mt-3 rounded-xl border-2 border-dashed px-4 py-7 text-center text-[13px] transition-colors duration-150 ${dragging ? "border-accent bg-accent/[0.06] text-fg" : "border-line-strong bg-elevated/50 text-muted"}`}
       >
         Drop files or a folder here
-        <div className="mt-2 flex justify-center gap-2">
+        <div className="mt-3 flex flex-wrap justify-center gap-2">
           <Button onClick={() => fileInput.current?.click()} disabled={uploading}>Choose files</Button>
           <Button onClick={() => dirInput.current?.click()} disabled={uploading}>Choose folder</Button>
         </div>
@@ -389,18 +389,18 @@ function ImportPanel({ existing, onStarted, ops }: { existing: Set<string>; onSt
   };
 
   return (
-    <Card className="p-4">
-      <h2 className="text-sm font-semibold text-fg">Import from a URL</h2>
-      <p className="mt-1 text-[11px] text-muted">
+    <Card className="p-5">
+      <h2 className="text-[16px] font-semibold text-fg">Import from a URL</h2>
+      <p className="mt-1 text-[12.5px] leading-relaxed text-muted">
         The Master downloads it once; workers then copy it over the lab network instead of the internet.
         Hugging Face: <code className="text-fg/85">hf://datasets/owner/repo/path/file.csv</code>
       </p>
       <input value={url} onChange={(e) => { setUrl(e.target.value); if (!name) setName(""); }} placeholder="https://… or hf://datasets/…"
-        className="mt-2 w-full rounded-md border border-line-strong bg-canvas px-2 py-1.5 font-mono text-xs text-fg outline-none focus:border-accent" />
+        className="mt-3 w-full rounded-lg border border-line-strong bg-elevated px-3 py-2 font-mono text-[12.5px] text-fg outline-none transition-colors duration-150 placeholder:text-muted/80 focus:border-accent" />
       <input value={name || suggest(url)} onChange={(e) => setName(e.target.value)} placeholder="dataset name"
-        className="mt-2 w-full rounded-md border border-line-strong bg-canvas px-2 py-1.5 font-mono text-xs text-fg outline-none focus:border-accent" />
+        className="mt-3 w-full rounded-lg border border-line-strong bg-elevated px-3 py-2 font-mono text-[12.5px] text-fg outline-none transition-colors duration-150 placeholder:text-muted/80 focus:border-accent" />
       {existing.has(normalizeDatasetName(name || suggest(url))) && <p className="mt-1 text-[11px] text-fg/85">Adds a new version of an existing dataset.</p>}
-      <div className="mt-2 flex items-center gap-2">
+      <div className="mt-3 flex items-center gap-2">
         <Button variant="primary" disabled={!url.trim() || busy || !normalizeDatasetName(name || suggest(url))} onClick={async () => {
           setErr(null); setBusy(true);
           try {
@@ -445,10 +445,10 @@ data = ImageFolder(root / "train")
 ts.download("https://…/file.zip", extract=True)   # straight from the internet, cached
 ts.upload("checkpoints", "my-model")              # publish results back to the Master`;
   return (
-    <Card className="p-4">
-      <h2 className="text-sm font-semibold text-fg">Using a dataset in code</h2>
-      <pre className="mt-2 whitespace-pre-wrap break-words rounded-lg border border-line bg-canvas p-2.5 font-mono text-[11px] leading-relaxed text-fg/85">{code}</pre>
-      <ul className="mt-2 list-disc space-y-1 pl-4 text-[11px] text-muted">
+    <Card className="p-5">
+      <h2 className="text-[16px] font-semibold text-fg">Using a dataset in code</h2>
+      <pre className="thin-scroll mt-3 overflow-x-auto whitespace-pre rounded-xl border border-line bg-canvas/70 p-3 font-mono text-[11.5px] leading-relaxed text-fg/90">{code}</pre>
+      <ul className="mt-3 list-disc space-y-1.5 pl-4 text-[12px] leading-relaxed text-muted">
         <li>Very large datasets (several GB): put them on the USB stick with <code className="text-fg/85">prepare_usb.cmd -Datasets name</code>, so no PC downloads them.</li>
         <li>Versions are immutable. <code className="text-fg/85">ts.dataset(&quot;name&quot;)</code> means the latest; copy the pinned form to keep a run reproducible.</li>
         <li>Use <code className="text-fg/85">num_workers=0</code> in DataLoaders on Windows workers.</li>

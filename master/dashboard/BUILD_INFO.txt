@@ -1,1 +1,1 @@
-Built 2026-11-11T20:49:53.570Z by frontend/build-static.js. Do not edit; rebuild instead.
+Built 2026-11-12T16:17:03.272Z by frontend/build-static.js. Do not edit; rebuild instead.

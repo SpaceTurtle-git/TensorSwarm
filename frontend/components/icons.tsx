@@ -67,6 +67,12 @@ export const IconCpu = (p: IconProps) => (
 export const IconGpu = (p: IconProps) => (
   <Svg {...p}><rect x="2.5" y="7" width="19" height="10" rx="1.8" /><circle cx="9" cy="12" r="2.4" /><circle cx="15.5" cy="12" r="2.4" /><path d="M5 17v2.5M8.5 17v2.5" /></Svg>
 );
+export const IconLaptop = (p: IconProps) => (
+  <Svg {...p}><rect x="4.5" y="4.5" width="15" height="10.5" rx="1.6" /><path d="M2.5 19h19l-1.6-4H4.1z" /></Svg>
+);
+export const IconLayers = (p: IconProps) => (
+  <Svg {...p}><path d="M12 3 2.5 8 12 13l9.5-5z" /><path d="m2.5 12 9.5 5 9.5-5" /><path d="m2.5 16 9.5 5 9.5-5" /></Svg>
+);
 export const IconServer = (p: IconProps) => (
   <Svg {...p}><rect x="3.5" y="4" width="17" height="7" rx="1.6" /><rect x="3.5" y="13" width="17" height="7" rx="1.6" /><path d="M7 7.5h.01M7 16.5h.01" /></Svg>
 );

@@ -23,7 +23,7 @@ export default function SidePanel({
 }) {
   const [tab, setTab] = useState<Tab>("runtime");
   return (
-    <aside className="flex h-full min-h-0 flex-col rounded-xl border border-line bg-surface/60">
+    <aside className="flex h-full min-h-0 flex-col rounded-xl border border-line glass-border glass">
       <div className="flex border-b border-line text-xs" role="tablist">
         {(["runtime", "variables", "data", "samples", "shortcuts"] as const).map((t) => (
           <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
@@ -69,15 +69,16 @@ function RuntimeTab({ kernel, kernelError }: { kernel: KernelRecord | null; kern
     return () => { alive = false; clearInterval(id); };
   }, [base, kernel?.kernel_id, kernel?.status]);
 
-  const utilPoints = useMemo(() => history.map((s) => ({ t: s.t, v: s.gpus.find((g) => g.index === (gpu?.index ?? 0))?.util ?? null })), [history, gpu?.index]);
+  const cpuOnly = kernel?.num_gpus === 0;
+  const utilPoints = useMemo(() => history.map((s) => ({ t: s.t, v: cpuOnly ? s.cpu : s.gpus.find((g) => g.index === (gpu?.index ?? 0))?.util ?? null })), [history, gpu?.index, cpuOnly]);
 
   if (!kernel) {
     return (
       <div className="space-y-4 text-xs text-muted">
         <div className="space-y-2">
           <p className="text-sm text-fg">Not connected</p>
-          <p>Click <b>Connect</b> (top right) to start a Python runtime on a worker's GPU, or <b>CPU only</b> on any PC (also PCs without a GPU). Or just run a cell: it connects automatically.</p>
-          <p>The runtime keeps your variables between cells, like Colab. It reserves its GPU share and CPU cores until you disconnect, and stops by itself after an hour without activity.</p>
+          <p>Click <b>Connect</b> and pick GPU seats for a GPU runtime, or only CPU cores for a CPU runtime (on any PC, also PCs without a GPU). Cells you run before that wait for it.</p>
+          <p>The runtime keeps your variables between cells, like Colab. It holds its GPU seats and CPU cores until you release it, and stops by itself after an hour without activity.</p>
           {kernelError && <p className="rounded border border-danger/40 bg-danger/10 p-2 text-danger-fg">{kernelError}</p>}
         </div>
         <ActiveRuntimes currentId={null} />
@@ -110,7 +111,16 @@ function RuntimeTab({ kernel, kernelError }: { kernel: KernelRecord | null; kern
           <KV k="Process" v={`pid ${info.pid}`} />
         </div>
       )}
-      {gpu && (
+      {cpuOnly && node && (
+        <div className="space-y-3">
+          <h4 className="text-[11px] font-medium uppercase tracking-wider text-muted">Live CPU ({node.hostname})</h4>
+          <Meter label="CPU load (whole PC)" value={node.host.cpu_utilization_pct} detail={`${fmtNum(node.host.cpu_utilization_pct)}%`} />
+          <Meter label="RAM (whole PC)" value={pct(node.host.ram_used_mb, node.host.ram_total_mb)} level={loadLevel(pct(node.host.ram_used_mb, node.host.ram_total_mb))}
+            detail={`${fmtMB(node.host.ram_used_mb)} / ${fmtMB(node.host.ram_total_mb)}`} />
+          <TimeChart title="CPU load, last 5 min" points={utilPoints} windowMs={5 * 60 * 1000} yMax={100} format={(v) => `${Math.round(v)}%`} height={90} />
+        </div>
+      )}
+      {gpu && !cpuOnly && (
         <div className="space-y-3">
           <h4 className="text-[11px] font-medium uppercase tracking-wider text-muted">Live GPU ({node?.hostname})</h4>
           <Meter label="Core load" value={gpu.gpu_utilization_pct} detail={`${fmtNum(gpu.gpu_utilization_pct)}%`} />

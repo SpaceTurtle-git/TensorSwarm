@@ -1,13 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import React, { useMemo, useState } from "react";
 import { useNodeHistory } from "../../lib/cluster";
 import { fmtMB, fmtNum, loadLevel, pct, tempLevel, timeAgo } from "../../lib/format";
 import { fmtShare, type MachineSeats } from "../../lib/seats";
 import type { HistorySample } from "../../lib/types";
 import TimeChart, { type Point } from "../TimeChart";
-import { IconArrowRight, IconClose } from "../icons";
+import { IconClose, IconLaptop } from "../icons";
 import { KV, LevelBadge, Meter, Segmented, StatusPill } from "../ui";
 
 const WINDOW_MS = 10 * 60 * 1000;
@@ -81,7 +80,10 @@ export default function MachinePanel({ machine, onClose }: { machine: MachineSea
     <div className="flex flex-col gap-6 p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
-          <h2 className="truncate text-[20px] font-semibold tracking-[-0.01em] text-fg">{machine.hostname}</h2>
+          <h2 className="flex min-w-0 items-center gap-2.5 text-[20px] font-semibold tracking-[-0.01em] text-fg">
+            <IconLaptop size={26} className={`shrink-0 ${machine.online ? "text-icon" : "text-muted/80"}`} />
+            <span className="truncate">{machine.hostname}</span>
+          </h2>
           <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-muted">
             <span className="font-mono">{node.tailscale_ip}</span>
             <StatusPill status={node.status} />
@@ -96,12 +98,6 @@ export default function MachinePanel({ machine, onClose }: { machine: MachineSea
         )}
       </div>
 
-      {machine.online && machine.inRay && (
-        <Link href={`/notebook?target=${encodeURIComponent(machine.ip)}`}
-          className="inline-flex items-center justify-between gap-2 rounded-xl border border-line bg-elevated/70 px-3.5 py-2.5 text-[13px] font-medium text-fg transition-colors duration-150 hover:border-line-strong">
-          Open an empty notebook on this PC <IconArrowRight size={15} />
-        </Link>
-      )}
 
       {gpu ? (
         <Section title="GPU">

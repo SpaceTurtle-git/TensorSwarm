@@ -839,6 +839,9 @@ def map(fn: Callable[[Any], Any], items: Iterable[Any], num_cpus: float = 1, num
         import sys
         import types
         os.environ["OMP_NUM_THREADS"] = os.environ["MKL_NUM_THREADS"] = str(threads)
+        if os.environ.get("CUDA_VISIBLE_DEVICES") == "":
+            # 0-GPU task on Windows: "" is dropped by the OS, so CUDA would still see the GPU.
+            os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
         if source:
             mod = sys.modules.get("tensorswarm")
             if mod is None or mod.__dict__.get("_TS_SOURCE") != source:
