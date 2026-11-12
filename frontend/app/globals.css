@@ -2,29 +2,259 @@
 @tailwind components;
 @tailwind utilities;
 
-/* The dashboard is dark-only. Chart colors are role tokens (dark-mode steps of the
-   validated reference palette); status colors are reserved for state and always ship
-   with an icon + label. */
-:root {
+/* =========================================================================================
+   TensorSwarm design tokens
+   One component tree, two themes. Components use only these semantic tokens (through the
+   Tailwind colours in tailwind.config.js); no component hardcodes a colour.
+   Values are "R G B" triplets so Tailwind opacity modifiers work (bg-accent/15).
+   The theme is chosen by data-theme on <html>, set before first paint by the inline script
+   in app/layout.tsx (lib/theme.tsx).
+
+   60-30-10: canvas/surface/elevated (60) · text, lines, seat states (30) · amber accent (10:
+   primary actions and selected resources only).
+
+   Contrast adjustments to the brief's palette (WCAG AA for small text):
+     light muted   #657A6E -> #586D61   (#657A6E is 3.9:1 on the sage cards)
+     light warn/danger keep their brief values as fills; text uses darker *-fg steps.
+   ========================================================================================= */
+
+:root,
+[data-theme="dark"] {
   color-scheme: dark;
-  --viz-surface: #0f172a;      /* slate-900: chart card surface */
-  --viz-series: #3987e5;       /* single-series blue (dark step) */
-  --viz-grid: rgba(148, 163, 184, 0.14);
-  --viz-axis: #64748b;
-  --status-good: #0ca30c;
-  --status-warning: #fab219;
-  --status-serious: #ec835a;
-  --status-critical: #d03b3b;
+  --canvas: 9 24 21;            /* #091815 main background */
+  --surface: 18 41 35;          /* #122923 cards and panels */
+  --elevated: 25 55 47;         /* #19372F elevated surfaces */
+  --line: 40 67 58;             /* #28433A borders */
+  --line-strong: 61 96 84;      /* hover / emphasised borders */
+  --fg: 232 241 237;            /* #E8F1ED primary text */
+  --muted: 155 175 167;         /* #9BAFA7 secondary text (6.7:1 on cards) */
+  --accent: 255 200 61;         /* #FFC83D primary accent */
+  --accent-hover: 255 214 112;
+  --accent-fg: 9 24 21;         /* text on amber */
+  --accent-edge: 255 200 61;    /* outline of a selected seat */
+  --seat-free: 184 216 201;     /* #B8D8C9 available GPU */
+  --seat-taken: 49 87 75;       /* #31574B taken GPU */
+  --seat-offline: 82 100 93;    /* #52645D offline GPU */
+  --ok: 79 209 139;             /* connected / healthy indicator */
+  --ok-fg: 120 220 165;
+  --warn: 255 157 69;           /* #FF9D45 */
+  --warn-fg: 255 157 69;
+  --danger: 241 109 109;        /* #F16D6D */
+  --danger-fg: 241 109 109;
+  --viz: 142 216 181;           /* chart series */
+  --glow: 36 105 78;            /* background radial glow */
+  --grid-line: 184 216 201;
+  --grid-alpha: 0.045;
+  --glow-alpha: 0.13;
+  --noise-alpha: 0.05;
+  --shadow: 0 0 0;
+  --shadow-alpha: 0.45;
+  /* Code editor syntax */
+  --syn-keyword: 255 200 61;
+  --syn-string: 142 216 181;
+  --syn-number: 255 157 69;
+  --syn-comment: 125 148 139;
+  --syn-function: 232 241 237;
+  --syn-def: 184 216 201;
+  --syn-builtin: 150 200 235;
 }
 
-html,
+[data-theme="light"] {
+  color-scheme: light;
+  --canvas: 244 248 245;        /* #F4F8F5 */
+  --surface: 229 239 233;       /* #E5EFE9 */
+  --elevated: 255 255 255;      /* #FFFFFF */
+  --line: 209 222 213;          /* #D1DED5 */
+  --line-strong: 170 191 179;
+  --fg: 27 48 39;               /* #1B3027 */
+  --muted: 88 109 97;           /* #586D61 (AA on every surface) */
+  --accent: 242 189 66;         /* #F2BD42 */
+  --accent-hover: 236 174 30;
+  --accent-fg: 27 48 39;
+  --accent-edge: 176 128 12;    /* gives the amber seat a 3:1 edge on light grounds */
+  --seat-free: 38 130 95;       /* #26825F */
+  --seat-taken: 175 203 190;    /* #AFCBBE */
+  --seat-offline: 184 197 190;  /* #B8C5BE */
+  --ok: 38 130 95;
+  --ok-fg: 29 110 79;
+  --warn: 185 106 23;           /* #B96A17 */
+  --warn-fg: 150 82 14;
+  --danger: 201 76 76;          /* #C94C4C */
+  --danger-fg: 176 58 58;
+  --viz: 38 130 95;
+  --glow: 160 199 178;
+  --grid-line: 27 48 39;
+  --grid-alpha: 0.04;
+  --glow-alpha: 0.28;
+  --noise-alpha: 0.035;
+  --shadow: 27 48 39;
+  --shadow-alpha: 0.12;
+  --syn-keyword: 150 82 14;
+  --syn-string: 29 110 79;
+  --syn-number: 176 58 58;
+  --syn-comment: 105 124 113;
+  --syn-function: 27 48 39;
+  --syn-def: 30 92 120;
+  --syn-builtin: 40 90 150;
+}
+
+/* ---------------------------------------------------------------- base */
+html {
+  background: rgb(var(--canvas));
+  -webkit-text-size-adjust: 100%;
+}
 body {
   margin: 0;
-  padding: 0;
-  background: #020617; /* slate-950 */
+  min-height: 100vh;
+  background: rgb(var(--canvas));
+  color: rgb(var(--fg));
+  font-size: 14px;
+  font-feature-settings: "ss01", "cv11";
+}
+::selection {
+  background: rgb(var(--accent) / 0.35);
+  color: rgb(var(--fg));
+}
+:focus-visible {
+  outline: 2px solid rgb(var(--accent));
+  outline-offset: 2px;
+}
+.tabular,
+td,
+th {
+  font-variant-numeric: tabular-nums;
 }
 
-/* CodeMirror inside notebook cells */
+/* ---------------------------------------------------------------- technical background
+   A very faint 36px grid that fades out away from the top, two soft radial glows and a
+   monochrome noise grain. Fixed behind everything; never competes with content. */
+.app-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(1100px 620px at 18% -12%, rgb(var(--glow) / var(--glow-alpha)), transparent 70%),
+    radial-gradient(900px 560px at 100% 4%, rgb(var(--glow) / calc(var(--glow-alpha) * 0.7)), transparent 72%),
+    rgb(var(--canvas));
+}
+.app-backdrop::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, rgb(var(--grid-line) / var(--grid-alpha)) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(var(--grid-line) / var(--grid-alpha)) 1px, transparent 1px);
+  background-size: 36px 36px;
+  -webkit-mask-image: radial-gradient(ellipse 85% 70% at 40% 0%, #000 30%, transparent 85%);
+  mask-image: radial-gradient(ellipse 85% 70% at 40% 0%, #000 30%, transparent 85%);
+}
+.app-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: var(--noise-alpha);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  mix-blend-mode: overlay;
+}
+
+/* ---------------------------------------------------------------- surfaces */
+.panel-shadow {
+  box-shadow: 0 1px 0 rgb(var(--fg) / 0.03) inset, 0 12px 32px -20px rgb(var(--shadow) / var(--shadow-alpha));
+}
+.pop-shadow {
+  box-shadow: 0 18px 48px -16px rgb(var(--shadow) / calc(var(--shadow-alpha) * 1.6)), 0 2px 6px rgb(var(--shadow) / calc(var(--shadow-alpha) * 0.5));
+}
+
+/* ---------------------------------------------------------------- GPU seats
+   Shape and fill change per state; colour is never the only signal (icons + tooltips). */
+.seat {
+  position: relative;
+  width: 34px;
+  height: 30px;
+  border-radius: 10px 10px 5px 5px;
+  border: 2px solid transparent;
+  display: grid;
+  place-items: center;
+  transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease, transform 180ms cubic-bezier(0.16, 1, 0.3, 1), filter 180ms ease;
+}
+.seat[data-state="free"] {
+  border-color: rgb(var(--seat-free));
+  background: rgb(var(--seat-free) / 0.06);
+  cursor: pointer;
+}
+.seat[data-state="free"]:hover,
+.seat[data-state="free"]:focus-visible {
+  filter: brightness(1.12);
+  border-color: rgb(var(--accent) / 0.85);
+  transform: translateY(-1px) scale(1.06);
+}
+.seat[data-state="selected"] {
+  background: rgb(var(--accent));
+  border-color: rgb(var(--accent-edge));
+  color: rgb(var(--accent-fg));
+  box-shadow: 0 0 0 3px rgb(var(--accent) / 0.22), 0 0 18px rgb(var(--accent) / 0.45);
+  transform: scale(1.04);
+  cursor: pointer;
+  animation: seat-pop 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.seat[data-state="selected"]:hover {
+  filter: brightness(1.05);
+}
+.seat[data-state="taken"] {
+  background: rgb(var(--seat-taken));
+  border-color: rgb(var(--seat-taken));
+  color: rgb(var(--fg) / 0.6);
+  cursor: not-allowed;
+}
+.seat[data-state="offline"] {
+  border-style: dashed;
+  border-color: rgb(var(--seat-offline));
+  color: rgb(var(--seat-offline));
+  cursor: not-allowed;
+}
+@keyframes seat-pop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.12); }
+  100% { transform: scale(1.04); }
+}
+
+/* ---------------------------------------------------------------- theme toggle icon */
+.theme-icon {
+  transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1), opacity 260ms ease;
+}
+[data-theme="dark"] .theme-icon-sun,
+[data-theme="light"] .theme-icon-moon {
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.5);
+}
+
+/* ---------------------------------------------------------------- ink-bleed theme transition
+   lib/inkTransition.ts drives the clip-path; these rules switch off the default cross-fade and
+   order the two snapshots. Forward (dark -> light): the new theme spreads on top. Reverse
+   (light -> dark): the old theme's ink retracts into the toggle, revealing the new one. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+html[data-ink="forward"]::view-transition-new(root) {
+  z-index: 2;
+  clip-path: circle(0px at var(--ink-x, 100%) var(--ink-y, 0%));
+}
+html[data-ink="forward"]::view-transition-old(root) { z-index: 1; }
+html[data-ink="reverse"]::view-transition-old(root) { z-index: 2; }
+html[data-ink="reverse"]::view-transition-new(root) { z-index: 1; }
+html[data-ink="fade"]::view-transition-old(root) {
+  animation: ink-fade-out 160ms ease both;
+}
+html[data-ink="fade"]::view-transition-new(root) {
+  animation: ink-fade-in 160ms ease both;
+}
+@keyframes ink-fade-out { to { opacity: 0; } }
+@keyframes ink-fade-in { from { opacity: 0; } }
+
+/* ---------------------------------------------------------------- CodeMirror inside notebook cells */
 .cell-editor .cm-editor {
   background: transparent;
   font-size: 13px;
@@ -33,35 +263,41 @@ body {
   outline: none;
 }
 .cell-editor .cm-scroller {
-  font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
-  line-height: 1.55;
-}
-.cell-editor .cm-gutters {
-  background: transparent;
-  border-right: none;
-  color: #475569;
-}
-.cell-editor .cm-activeLine,
-.cell-editor .cm-activeLineGutter {
-  background: rgba(148, 163, 184, 0.06);
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Consolas, monospace;
+  line-height: 1.6;
 }
 
-/* Rendered markdown cells */
-.md-cell h1 { font-size: 1.5rem; font-weight: 600; margin: 0.4rem 0 0.6rem; color: #f8fafc; }
-.md-cell h2 { font-size: 1.2rem; font-weight: 600; margin: 0.4rem 0 0.5rem; color: #f1f5f9; }
-.md-cell h3 { font-size: 1.05rem; font-weight: 600; margin: 0.3rem 0 0.4rem; color: #e2e8f0; }
-.md-cell p { margin: 0.35rem 0; line-height: 1.6; }
+/* ---------------------------------------------------------------- rendered markdown cells */
+.md-cell h1 { font-size: 1.5rem; font-weight: 700; margin: 0.4rem 0 0.6rem; color: rgb(var(--fg)); letter-spacing: -0.02em; }
+.md-cell h2 { font-size: 1.2rem; font-weight: 600; margin: 0.4rem 0 0.5rem; color: rgb(var(--fg)); }
+.md-cell h3 { font-size: 1.05rem; font-weight: 600; margin: 0.3rem 0 0.4rem; color: rgb(var(--fg)); }
+.md-cell p { margin: 0.35rem 0; line-height: 1.65; }
 .md-cell ul { list-style: disc; padding-left: 1.4rem; margin: 0.35rem 0; }
 .md-cell ol { list-style: decimal; padding-left: 1.4rem; margin: 0.35rem 0; }
-.md-cell code { background: #1e293b; padding: 0.1rem 0.35rem; border-radius: 0.25rem; font-size: 0.85em; color: #a5f3fc; }
-.md-cell pre { background: #0b1220; padding: 0.6rem 0.8rem; border-radius: 0.4rem; overflow-x: auto; }
-.md-cell pre code { background: none; padding: 0; }
-.md-cell a { color: #7dd3fc; text-decoration: underline; }
+.md-cell code { background: rgb(var(--elevated)); border: 1px solid rgb(var(--line)); padding: 0.05rem 0.35rem; border-radius: 0.3rem; font-size: 0.85em; color: rgb(var(--fg)); }
+.md-cell pre { background: rgb(var(--canvas)); border: 1px solid rgb(var(--line)); padding: 0.6rem 0.8rem; border-radius: 0.5rem; overflow-x: auto; }
+.md-cell pre code { background: none; border: 0; padding: 0; }
+.md-cell a { color: rgb(var(--fg)); text-decoration: underline; text-decoration-color: rgb(var(--accent)); text-underline-offset: 3px; }
 .md-cell table { border-collapse: collapse; margin: 0.5rem 0; }
-.md-cell th, .md-cell td { border: 1px solid #334155; padding: 0.25rem 0.6rem; }
-.md-cell blockquote { border-left: 3px solid #334155; padding-left: 0.8rem; color: #94a3b8; }
+.md-cell th, .md-cell td { border: 1px solid rgb(var(--line)); padding: 0.25rem 0.6rem; }
+.md-cell blockquote { border-left: 3px solid rgb(var(--line-strong)); padding-left: 0.8rem; color: rgb(var(--muted)); }
 
-/* Thin scrollbars for output areas */
+/* ---------------------------------------------------------------- scrollbars */
+* {
+  scrollbar-color: rgb(var(--line-strong)) transparent;
+}
+.thin-scroll { scrollbar-width: thin; }
 .thin-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
-.thin-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+.thin-scroll::-webkit-scrollbar-thumb { background: rgb(var(--line-strong)); border-radius: 4px; }
 .thin-scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------------------------------------------------------------- motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}

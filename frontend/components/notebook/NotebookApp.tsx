@@ -11,6 +11,8 @@ import {
 } from "../../lib/notebook";
 import { useRuntime } from "../../lib/runtime";
 import type { ExecutionPoll, JobResult, Sample } from "../../lib/types";
+import { IconClose, IconJobs, IconRefresh, IconStop } from "../icons";
+import PageHeader from "../PageHeader";
 import { Button, StatusPill } from "../ui";
 import ConnectDialog from "./ConnectDialog";
 import NotebookCell from "./NotebookCell";
@@ -62,9 +64,22 @@ export default function NotebookApp() {
     const nbs = notebooks.length ? notebooks : [WELCOME()];
     let active = activeId && nbs.some((n) => n.id === activeId) ? activeId : nbs[0].id;
     const target = params.get("target");
-    if (target) {
-      const nb = newNotebook(`Notebook on ${target}`);
-      nb.target = target;
+    const kernelParam = params.get("kernel");
+    const attached = kernelParam ? nbs.find((n) => n.kernelId === kernelParam) : undefined;
+    if (attached) {
+      // Reload of a page opened from the Cluster page: reuse that notebook.
+      active = attached.id;
+    } else if (target || kernelParam) {
+      const nb = newNotebook(params.get("name") || `Notebook on ${target}`);
+      nb.target = target ?? "";
+      if (kernelParam) {
+        // A runtime the Cluster page already started (seats picked there): attach to it.
+        nb.kernelId = kernelParam;
+        const share = params.has("share") ? Number(params.get("share")) : NaN;
+        const cores = params.has("cores") ? Number(params.get("cores")) : NaN;
+        if (Number.isFinite(share) && share >= 0) nb.gpuShare = share;
+        if (Number.isFinite(cores) && cores > 0) nb.cpuCores = cores;
+      }
       nbs.unshift(nb);
       active = nb.id;
     }
@@ -396,26 +411,28 @@ export default function NotebookApp() {
   const runtimeGpu = runtimeNode?.gpus[0];
   const anyRunning = nb?.cells.some((c) => c.status === "running" || c.status === "queued") ?? false;
 
-  if (!store || !nb) return <div className="p-10 text-center text-sm text-slate-500">Loading notebooks…</div>;
+  if (!store || !nb) return <div className="p-10 text-center text-sm text-muted">Loading notebooks…</div>;
 
   return (
-    <div className="mx-auto grid max-w-[1600px] gap-4 px-4 py-4 md:px-6 xl:grid-cols-[1fr_360px]">
+    <main className="min-w-0 flex-1 px-4 py-5 md:px-8 md:py-6">
+    <PageHeader compact title="Notebook" subtitle="Cells run in a persistent Python runtime on a worker's GPU, or CPU only on any PC." />
+    <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="min-w-0">
         {/* ------------------------------------------------------------ header */}
-        <div className="sticky top-[49px] z-20 -mx-1 mb-3 rounded-xl border border-slate-800 bg-slate-950/95 px-3 py-2 backdrop-blur">
+        <div className="sticky top-14 z-20 -mx-1 mb-3 rounded-2xl border border-line bg-surface/90 px-3 py-2 backdrop-blur panel-shadow lg:top-3">
           <div className="flex flex-wrap items-center gap-2">
             {renaming ? (
               <input autoFocus defaultValue={nb.name}
                 onBlur={(e) => { updateNb(nb.id, (n) => ({ ...n, name: e.target.value.trim() || n.name })); setRenaming(false); }}
                 onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                className="w-56 rounded border border-slate-600 bg-slate-900 px-2 py-1 text-sm text-slate-100 focus:outline-none" />
+                className="w-56 rounded border border-line-strong bg-surface px-2 py-1 text-sm text-fg focus:outline-none" />
             ) : (
-              <button onClick={() => setRenaming(true)} title="Rename" className="max-w-[18rem] truncate rounded px-1.5 py-1 text-sm font-semibold text-slate-100 hover:bg-slate-800">
+              <button onClick={() => setRenaming(true)} title="Rename" className="max-w-[18rem] truncate rounded px-1.5 py-1 text-sm font-semibold text-fg hover:bg-elevated">
                 {nb.name}
               </button>
             )}
             <select value={nb.id} onChange={(e) => setStore((s) => (s ? { ...s, activeId: e.target.value } : s))}
-              className="max-w-[12rem] rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-300" aria-label="Switch notebook">
+              className="max-w-[12rem] rounded border border-line-strong bg-surface px-2 py-1 text-xs text-fg/85" aria-label="Switch notebook">
               {store.notebooks.map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}
             </select>
             <Button variant="ghost" onClick={() => addNotebook(newNotebook())}>New</Button>
@@ -440,7 +457,7 @@ export default function NotebookApp() {
             <div className="ml-auto flex items-center gap-2">
               {kernel && <StatusPill status={kernel.status} />}
               {kernel?.status === "READY" && runtimeGpu && (
-                <button onClick={() => setShowConnect(true)} className="hidden items-center gap-2 rounded-lg border border-slate-800 px-2 py-1 text-[11px] text-slate-300 hover:border-slate-600 lg:flex"
+                <button onClick={() => setShowConnect(true)} className="hidden items-center gap-2 rounded-lg border border-line px-2 py-1 text-[11px] text-fg/85 hover:border-line-strong lg:flex"
                   title="Live GPU telemetry of the connected worker">
                   <span className="max-w-[10rem] truncate">{runtimeGpu.name.replace("NVIDIA GeForce ", "")} · {runtimeNode?.hostname}</span>
                   <MiniBar label="GPU" value={runtimeGpu.gpu_utilization_pct} />
@@ -454,28 +471,28 @@ export default function NotebookApp() {
               )}
             </div>
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-slate-800/80 pt-2">
+          <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-line/80 pt-2">
             <Button onClick={() => insertCell(activeCell, "below", "code")}>+ Code</Button>
             <Button onClick={() => insertCell(activeCell, "below", "markdown")}>+ Text</Button>
-            <span className="mx-1 h-4 w-px bg-slate-800" />
-            <Button onClick={() => runAll("all")} title="Run every cell from the top">▶ Run all</Button>
+            <span className="mx-1 h-4 w-px bg-elevated" />
+            <Button onClick={() => runAll("all")} title="Run every cell from the top"><IconJobs size={14} /> Run all</Button>
             <Button variant="ghost" onClick={() => runAll("before")} disabled={!activeCell}>Run before</Button>
             <Button variant="ghost" onClick={() => runAll("after")} disabled={!activeCell}>Run selected & after</Button>
-            <Button variant="ghost" onClick={() => runtime.interrupt()} disabled={!anyRunning} title="Ctrl+M I">■ Interrupt</Button>
-            <Button variant="ghost" onClick={restart} disabled={!kernel || kernel.status !== "READY"} title="Clears all variables (Ctrl+M .)">↻ Restart</Button>
+            <Button variant="ghost" onClick={() => runtime.interrupt()} disabled={!anyRunning} title="Ctrl+M I"><IconStop size={13} /> Interrupt</Button>
+            <Button variant="ghost" onClick={restart} disabled={!kernel || kernel.status !== "READY"} title="Clears all variables (Ctrl+M .)"><IconRefresh size={14} /> Restart</Button>
             <Button variant="ghost" onClick={clearOutputs}>Clear outputs</Button>
-            <span className="mx-1 h-4 w-px bg-slate-800" />
+            <span className="mx-1 h-4 w-px bg-elevated" />
             <Button variant="ghost" onClick={runAsJob} title="Submit all code cells as one batch job (Jobs page)">Run as batch job</Button>
-            <span className="ml-auto text-[11px] text-slate-500">
+            <span className="ml-auto text-[11px] text-muted">
               {nb.target ? `target ${nb.target}` : "any GPU"} · share {nb.gpuShare ?? 1}
             </span>
           </div>
         </div>
 
         {(notice || runtime.error) && (
-          <div className="mb-3 flex items-start justify-between gap-3 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-300">
-            <span className={runtime.error ? "text-rose-300" : ""}>{runtime.error ?? notice}</span>
-            <button onClick={() => { setNotice(null); runtime.setError(null); }} className="text-slate-500 hover:text-white" aria-label="Dismiss">✕</button>
+          <div className="mb-3 flex items-start justify-between gap-3 rounded-lg border border-line-strong bg-surface px-3 py-2 text-xs text-fg/85">
+            <span className={runtime.error ? "text-danger-fg" : ""}>{runtime.error ?? notice}</span>
+            <button onClick={() => { setNotice(null); runtime.setError(null); }} className="text-muted hover:text-fg" aria-label="Dismiss"><IconClose size={14} /></button>
           </div>
         )}
 
@@ -505,7 +522,7 @@ export default function NotebookApp() {
         </div>
       </div>
 
-      <div className="xl:sticky xl:top-[60px] xl:h-[calc(100vh-76px)]">
+      <div className="xl:sticky xl:top-3 xl:h-[calc(100vh-24px)]">
         <SidePanel kernel={kernel} kernelError={runtime.error} varsVersion={varsVersion} onInsertSample={insertSample} onOpenSample={openSample} onInsertCode={insertCode} />
       </div>
 
@@ -516,15 +533,16 @@ export default function NotebookApp() {
           onConnect={(t, s, c) => { setShowConnect(false); connect(t, s, c); }} />
       )}
     </div>
+    </main>
   );
 }
 
 function MiniBar({ label, value, title }: { label: string; value: number; title?: string }) {
   return (
     <span className="flex items-center gap-1" title={title ?? `${Math.round(value)}%`}>
-      <span className="text-slate-500">{label}</span>
-      <span className="h-1.5 w-10 overflow-hidden rounded-full bg-slate-800">
-        <span className="block h-1.5 rounded-full" style={{ width: `${Math.max(2, Math.min(100, value))}%`, background: "var(--viz-series)" }} />
+      <span className="text-muted">{label}</span>
+      <span className="h-1.5 w-10 overflow-hidden rounded-full bg-elevated">
+        <span className="block h-1.5 rounded-full bg-viz transition-[width] duration-[400ms]" style={{ width: `${Math.max(2, Math.min(100, value))}%` }} />
       </span>
     </span>
   );

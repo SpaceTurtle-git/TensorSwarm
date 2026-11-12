@@ -3,7 +3,8 @@
 import React, { useMemo, useRef } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { python } from "@codemirror/lang-python";
-import { oneDark } from "@codemirror/theme-one-dark";
+import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { tags as t } from "@lezer/highlight";
 import { EditorView, keymap } from "@codemirror/view";
 import { Prec } from "@codemirror/state";
 
@@ -24,10 +25,41 @@ interface Props extends EditorKeys {
   placeholder?: string;
 }
 
-const transparentTheme = EditorView.theme({
-  "&": { backgroundColor: "transparent" },
-  ".cm-content": { padding: "10px 0" },
+// Editor chrome and syntax colours come from the theme tokens (app/globals.css), so the editor
+// follows the light/dark switch without re-creating any extension.
+const c = (name: string, alpha = 1) => `rgb(var(--${name}) / ${alpha})`;
+
+const tokenTheme = EditorView.theme({
+  "&": { backgroundColor: "transparent", color: c("fg") },
+  ".cm-content": { padding: "10px 0", caretColor: c("accent") },
+  ".cm-cursor, .cm-dropCursor": { borderLeftColor: c("accent"), borderLeftWidth: "2px" },
+  "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": { backgroundColor: c("accent", 0.28) },
+  ".cm-gutters": { backgroundColor: "transparent", border: "none", color: c("muted", 0.75) },
+  ".cm-activeLine": { backgroundColor: c("fg", 0.04) },
+  ".cm-activeLineGutter": { backgroundColor: "transparent", color: c("fg") },
+  ".cm-matchingBracket, &.cm-focused .cm-matchingBracket": { backgroundColor: c("accent", 0.22), outline: "none" },
+  ".cm-placeholder": { color: c("muted") },
+  ".cm-tooltip": { backgroundColor: c("elevated"), border: `1px solid ${c("line-strong")}`, color: c("fg"), borderRadius: "8px" },
+  ".cm-tooltip-autocomplete ul li[aria-selected]": { backgroundColor: c("accent", 0.25), color: c("fg") },
 });
+
+const tokenHighlight = syntaxHighlighting(
+  HighlightStyle.define([
+    { tag: [t.keyword, t.controlKeyword, t.operatorKeyword, t.moduleKeyword, t.definitionKeyword], color: c("syn-keyword") },
+    { tag: [t.string, t.special(t.string), t.regexp], color: c("syn-string") },
+    { tag: [t.number, t.bool, t.null, t.atom], color: c("syn-number") },
+    { tag: [t.comment, t.lineComment, t.blockComment], color: c("syn-comment"), fontStyle: "italic" },
+    { tag: [t.function(t.variableName), t.function(t.propertyName)], color: c("syn-function"), fontWeight: "500" },
+    { tag: [t.definition(t.variableName), t.className, t.definition(t.className)], color: c("syn-def") },
+    { tag: [t.standard(t.variableName), t.self], color: c("syn-builtin") },
+    { tag: [t.propertyName, t.attributeName], color: c("fg", 0.9) },
+    { tag: [t.operator, t.punctuation, t.bracket], color: c("muted") },
+    { tag: t.heading, color: c("fg"), fontWeight: "700" },
+    { tag: t.emphasis, fontStyle: "italic" },
+    { tag: t.strong, fontWeight: "700" },
+    { tag: t.link, color: c("syn-builtin"), textDecoration: "underline" },
+  ]),
+);
 
 export default function CodeEditor({ value, onChange, language = "python", autoFocus, onFocus, minHeight, placeholder, ...keys }: Props) {
   // Latest handlers live in a ref so the keymap extension is created once.
@@ -42,7 +74,8 @@ export default function CodeEditor({ value, onChange, language = "python", autoF
       return true;
     };
     const exts = [
-      transparentTheme,
+      tokenTheme,
+      tokenHighlight,
       EditorView.lineWrapping,
       Prec.highest(
         keymap.of([
@@ -62,7 +95,7 @@ export default function CodeEditor({ value, onChange, language = "python", autoF
       <CodeMirror
         value={value}
         onChange={onChange}
-        theme={oneDark}
+        theme="none"
         extensions={extensions}
         autoFocus={autoFocus}
         placeholder={placeholder}

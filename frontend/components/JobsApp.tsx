@@ -8,9 +8,10 @@ import { api, postJson } from "../lib/api";
 import { computeTargets, CORE_CHOICES, defaultCores, useCluster, useSamples, type ComputeTarget } from "../lib/cluster";
 import { fmtDuration, fmtMB, timeAgo } from "../lib/format";
 import type { JobResult, Sample } from "../lib/types";
+import PageHeader from "./PageHeader";
 import { Button, Card, StatusPill } from "./ui";
 
-const CodeEditor = dynamic(() => import("./CodeEditor"), { ssr: false, loading: () => <div className="h-40 animate-pulse rounded bg-slate-900" /> });
+const CodeEditor = dynamic(() => import("./CodeEditor"), { ssr: false, loading: () => <div className="h-40 animate-pulse rounded bg-surface" /> });
 
 const ALL = "__all__";
 const CATEGORY_ORDER = ["Notebook", "Diagnostics", "Benchmarks", "Stress", "Training"];
@@ -29,7 +30,7 @@ function TargetSelect({ value, onChange, share, allowAll = true }: { value: stri
   const noun = share > 0 ? "GPU PC" : "PC";
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)} aria-label="Target"
-      className="max-w-[22rem] rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-200">
+      className="max-w-[22rem] rounded-lg border border-line-strong bg-surface px-2 py-1.5 text-xs text-fg">
       <option value="">{share > 0 ? "Any free GPU" : "Any PC with free cores"}</option>
       {allowAll && targets.length > 1 && <option value={ALL}>Every {noun} ({targets.length}) — compare</option>}
       {targets.map((t) => <option key={t.ip} value={t.ip}>{t.label} ({t.ip})</option>)}
@@ -41,7 +42,7 @@ function TargetSelect({ value, onChange, share, allowAll = true }: { value: stri
 function ShareSelect({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   return (
     <select value={value} onChange={(e) => onChange(Number(e.target.value))} aria-label="GPU share"
-      className="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-200">
+      className="rounded-lg border border-line-strong bg-surface px-2 py-1.5 text-xs text-fg">
       <option value={1}>1 GPU</option>
       <option value={0.5}>0.5 GPU</option>
       <option value={0.25}>0.25 GPU</option>
@@ -54,7 +55,7 @@ function CoresSelect({ value, onChange }: { value: number; onChange: (v: number)
   return (
     <select value={value} onChange={(e) => onChange(Number(e.target.value))} aria-label="CPU cores"
       title="CPU cores reserved for the job (PyTorch/NumPy threads)"
-      className="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-200">
+      className="rounded-lg border border-line-strong bg-surface px-2 py-1.5 text-xs text-fg">
       {CORE_CHOICES.map((c) => <option key={c} value={c}>{c} core{c > 1 ? "s" : ""}</option>)}
     </select>
   );
@@ -113,28 +114,26 @@ export default function JobsApp() {
   const shown = samples.filter((s) => category === "All" || s.category === category);
 
   return (
-    <main className="mx-auto max-w-[1600px] space-y-6 px-4 py-6 md:px-6">
-      <div>
-        <h1 className="text-xl font-semibold text-slate-50">Jobs & sample scripts</h1>
-        <p className="text-xs text-slate-400">
-          A job runs a whole script once on a worker and returns its output. For interactive work use the{" "}
-          <Link href="/notebook" className="text-emerald-300 underline">notebook</Link>.
-        </p>
-      </div>
+    <main className="min-w-0 flex-1 space-y-6 px-4 py-6 md:px-8 md:py-8">
+      <PageHeader
+        title="Jobs & samples"
+        subtitle={<>A job runs a whole script once on a worker and returns its output. For interactive work use the{" "}
+          <Link href="/notebook" className="font-medium text-fg underline decoration-accent underline-offset-2">notebook</Link>.</>}
+      />
 
-      {message && <div className="rounded-lg border border-rose-900 bg-rose-950/40 px-3 py-2 text-xs text-rose-300">{message}</div>}
+      {message && <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger-fg">{message}</div>}
 
       {/* ---------------------------------------------------------------- comparison batches */}
       {batches.map((b) => (
         <Card key={b.id} className="p-4">
           <div className="flex items-baseline justify-between">
-            <h2 className="text-sm font-semibold text-slate-100">Fleet comparison: {b.title}</h2>
-            <button onClick={() => setBatches((x) => x.filter((y) => y.id !== b.id))} className="text-xs text-slate-500 hover:text-white">Dismiss</button>
+            <h2 className="text-sm font-semibold text-fg">Fleet comparison: {b.title}</h2>
+            <button onClick={() => setBatches((x) => x.filter((y) => y.id !== b.id))} className="text-xs text-muted hover:text-fg">Dismiss</button>
           </div>
           <div className="mt-2 overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-slate-800 text-left text-[10px] uppercase tracking-wider text-slate-500">
+                <tr className="border-b border-line text-left text-[10px] uppercase tracking-wider text-muted">
                   <th className="py-1.5 pr-3 font-medium">Node</th><th className="py-1.5 pr-3 font-medium">GPU</th>
                   <th className="py-1.5 pr-3 font-medium">Status</th><th className="py-1.5 pr-3 font-medium">Time</th>
                   <th className="py-1.5 pr-3 font-medium">Peak VRAM</th><th className="py-1.5 font-medium">Result</th>
@@ -144,13 +143,13 @@ export default function JobsApp() {
                 {b.jobIds.map((id) => {
                   const j = jobById[id];
                   return (
-                    <tr key={id} className="cursor-pointer border-b border-slate-800/50 hover:bg-slate-800/30" onClick={() => setOpen(id)}>
-                      <td className="py-1.5 pr-3 text-slate-200">{j?.executed_on_node ?? j?.target_node_ip ?? "…"}</td>
-                      <td className="py-1.5 pr-3 text-slate-300">{j?.gpu_used ?? "—"}</td>
+                    <tr key={id} className="cursor-pointer border-b border-line/50 hover:bg-elevated/30" onClick={() => setOpen(id)}>
+                      <td className="py-1.5 pr-3 text-fg">{j?.executed_on_node ?? j?.target_node_ip ?? "…"}</td>
+                      <td className="py-1.5 pr-3 text-fg/85">{j?.gpu_used ?? "—"}</td>
                       <td className="py-1.5 pr-3"><StatusPill status={j?.status ?? "PENDING"} /></td>
-                      <td className="py-1.5 pr-3 font-mono text-slate-300">{fmtDuration(j?.execution_time_sec)}</td>
-                      <td className="py-1.5 pr-3 font-mono text-slate-300">{j?.vram_peak_mb ? fmtMB(j.vram_peak_mb) : "—"}</td>
-                      <td className="py-1.5 font-mono text-slate-200">{j?.status === "FAILED" ? <span className="text-rose-300">{(j.error ?? "").split("\n").filter(Boolean).pop()}</span> : j?.result ?? ""}</td>
+                      <td className="py-1.5 pr-3 font-mono text-fg/85">{fmtDuration(j?.execution_time_sec)}</td>
+                      <td className="py-1.5 pr-3 font-mono text-fg/85">{j?.vram_peak_mb ? fmtMB(j.vram_peak_mb) : "—"}</td>
+                      <td className="py-1.5 font-mono text-fg">{j?.status === "FAILED" ? <span className="text-danger-fg">{(j.error ?? "").split("\n").filter(Boolean).pop()}</span> : j?.result ?? ""}</td>
                     </tr>
                   );
                 })}
@@ -163,9 +162,9 @@ export default function JobsApp() {
       {/* ---------------------------------------------------------------- samples */}
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-slate-100">Sample scripts for testing worker nodes</h2>
+          <h2 className="text-sm font-semibold text-fg">Sample scripts for testing worker nodes</h2>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] text-slate-500">Run on</span>
+            <span className="text-[11px] text-muted">Run on</span>
             <TargetSelect value={target} onChange={setTarget} share={share} />
             <ShareSelect value={share} onChange={setShare} />
             <CoresSelect value={cores} onChange={setCores} />
@@ -174,27 +173,27 @@ export default function JobsApp() {
         <div className="flex gap-1">
           {categories.map((c) => (
             <button key={c} onClick={() => setCategory(c)}
-              className={`rounded-full px-3 py-1 text-xs ${category === c ? "bg-slate-200 text-slate-900" : "bg-slate-900 text-slate-400 hover:text-slate-200"}`}>
+              className={`rounded-full px-3 py-1 text-xs ${category === c ? "bg-fg font-medium text-canvas" : "bg-surface text-muted hover:text-fg"}`}>
               {c}
             </button>
           ))}
         </div>
-        {samplesError && <p className="text-xs text-rose-300">Could not load samples: {samplesError}</p>}
+        {samplesError && <p className="text-xs text-danger-fg">Could not load samples: {samplesError}</p>}
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {shown.map((s: Sample) => (
             <Card key={s.id} className="flex flex-col p-4">
               <div className="flex items-baseline justify-between gap-2">
-                <h3 className="text-sm font-semibold text-slate-100">{s.title}</h3>
-                <span className="shrink-0 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-400">{s.category}</span>
+                <h3 className="text-sm font-semibold text-fg">{s.title}</h3>
+                <span className="shrink-0 rounded bg-elevated px-1.5 py-0.5 text-[10px] text-muted">{s.category}</span>
               </div>
-              <p className="mt-1 flex-1 text-xs leading-relaxed text-slate-400">{s.description}</p>
-              <div className="mt-2 text-[10.5px] text-slate-500">{s.runtime}{s.gpu === "required" ? " · needs a GPU" : ""}</div>
+              <p className="mt-1 flex-1 text-xs leading-relaxed text-muted">{s.description}</p>
+              <div className="mt-2 text-[10.5px] text-muted">{s.runtime}{s.gpu === "required" ? " · needs a GPU" : ""}</div>
               <div className="mt-3 flex gap-2">
-                <Link href={`/notebook?sample=${encodeURIComponent(s.id)}`} className="inline-flex items-center rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-700">
+                <Link href={`/notebook?sample=${encodeURIComponent(s.id)}`} className="inline-flex items-center rounded-lg bg-elevated px-3 py-1.5 text-xs font-medium text-fg hover:bg-line">
                   Open in notebook
                 </Link>
                 {s.mode === "notebook" ? (
-                  <span className="self-center text-[10.5px] text-slate-500">notebook only (uses ! shell lines)</span>
+                  <span className="self-center text-[10.5px] text-muted">notebook only (uses ! shell lines)</span>
                 ) : (
                   <Button variant="primary" onClick={() => submit(s.code, s.title, target, share)}
                     title={s.gpu === "required" && share === 0 ? "This sample needs a GPU: choose a GPU share" : undefined}>
@@ -211,8 +210,8 @@ export default function JobsApp() {
       <Card className="p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="text-sm font-semibold text-slate-100">Batch script</h2>
-            <p className="text-[11px] text-slate-400">Runs top to bottom on one worker. Set a variable named <code>result</code> to return a value.</p>
+            <h2 className="text-sm font-semibold text-fg">Batch script</h2>
+            <p className="text-[11px] text-muted">Runs top to bottom on one worker. Set a variable named <code>result</code> to return a value.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <TargetSelect value={target} onChange={setTarget} share={share} />
@@ -221,41 +220,41 @@ export default function JobsApp() {
             <Button variant="primary" onClick={() => submit(script, "batch_script", target, share)}>Run (Ctrl+Enter)</Button>
           </div>
         </div>
-        <div className="mt-3 rounded-lg border border-slate-800 bg-[#1e222a]">
+        <div className="mt-3 rounded-lg border border-line bg-canvas/60">
           <CodeEditor value={script} onChange={setScript} minHeight="160px" onRun={() => submit(script, "batch_script", target, share)} />
         </div>
       </Card>
 
       {/* ---------------------------------------------------------------- history */}
       <Card className="p-4">
-        <h2 className="text-sm font-semibold text-slate-100">Job history</h2>
+        <h2 className="text-sm font-semibold text-fg">Job history</h2>
         {jobs.length === 0 ? (
-          <p className="mt-2 text-xs text-slate-500">No jobs yet (the Master keeps them in memory until it restarts).</p>
+          <p className="mt-2 text-xs text-muted">No jobs yet (the Master keeps them in memory until it restarts).</p>
         ) : (
-          <div className="mt-2 divide-y divide-slate-800/70">
+          <div className="mt-2 divide-y divide-line/70">
             {jobs.map((j) => (
               <div key={j.job_id}>
                 <button onClick={() => setOpen(open === j.job_id ? null : j.job_id)}
-                  className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 py-2 text-left text-xs hover:bg-slate-800/20">
+                  className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 py-2 text-left text-xs hover:bg-elevated/20">
                   <StatusPill status={j.status} />
-                  <span className="font-medium text-slate-200">{j.job_name}</span>
-                  <span className="font-mono text-slate-500">{j.job_id}</span>
-                  <span className="text-slate-400">{j.executed_on_node ?? j.target_node_ip ?? ((j.num_gpus ?? 1) > 0 ? "any GPU" : "any PC")}</span>
-                  {j.gpu_used && <span className="text-slate-400">{j.gpu_used}</span>}
-                  <span className="ml-auto text-slate-500">{fmtDuration(j.execution_time_sec)} · {timeAgo(j.submitted_at)}</span>
+                  <span className="font-medium text-fg">{j.job_name}</span>
+                  <span className="font-mono text-muted">{j.job_id}</span>
+                  <span className="text-muted">{j.executed_on_node ?? j.target_node_ip ?? ((j.num_gpus ?? 1) > 0 ? "any GPU" : "any PC")}</span>
+                  {j.gpu_used && <span className="text-muted">{j.gpu_used}</span>}
+                  <span className="ml-auto text-muted">{fmtDuration(j.execution_time_sec)} · {timeAgo(j.submitted_at)}</span>
                 </button>
                 {open === j.job_id && (
-                  <div className="mb-3 space-y-2 rounded-lg border border-slate-800 bg-slate-950/70 p-3 font-mono text-[12px]">
-                    <div className="flex flex-wrap gap-x-4 text-[11px] text-slate-400">
+                  <div className="mb-3 space-y-2 rounded-lg border border-line bg-canvas/70 p-3 font-mono text-[12px]">
+                    <div className="flex flex-wrap gap-x-4 text-[11px] text-muted">
                       <span>{(j.num_gpus ?? 1) > 0 ? `GPU share ${j.num_gpus ?? 1}` : "CPU only"} · {j.num_cpus ?? 1} core(s)</span>
                       {j.vram_peak_mb ? <span>peak VRAM {fmtMB(j.vram_peak_mb)}</span> : null}
                       {j.executed_on_ip && <span>{j.executed_on_ip}</span>}
-                      {(j.status === "PENDING" || j.status === "RUNNING") && <span className="text-amber-300">waiting for output… (a job reports when it finishes; it may be waiting for a free GPU share or CPU cores)</span>}
+                      {(j.status === "PENDING" || j.status === "RUNNING") && <span className="text-warn-fg">waiting for output… (a job reports when it finishes; it may be waiting for a free GPU share or CPU cores)</span>}
                     </div>
-                    {j.stdout && <pre className="thin-scroll max-h-96 overflow-auto whitespace-pre-wrap text-slate-200">{j.stdout}</pre>}
-                    {j.stderr && <pre className="thin-scroll max-h-48 overflow-auto whitespace-pre-wrap text-amber-200/90">{j.stderr}</pre>}
-                    {j.result && <div className="text-cyan-300">result: {j.result}</div>}
-                    {j.error && <pre className="whitespace-pre-wrap text-rose-300">{j.error}</pre>}
+                    {j.stdout && <pre className="thin-scroll max-h-96 overflow-auto whitespace-pre-wrap text-fg">{j.stdout}</pre>}
+                    {j.stderr && <pre className="thin-scroll max-h-48 overflow-auto whitespace-pre-wrap text-warn-fg">{j.stderr}</pre>}
+                    {j.result && <div className="text-fg">result: {j.result}</div>}
+                    {j.error && <pre className="whitespace-pre-wrap text-danger-fg">{j.error}</pre>}
                   </div>
                 )}
               </div>

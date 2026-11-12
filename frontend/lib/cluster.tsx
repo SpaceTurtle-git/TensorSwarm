@@ -2,7 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { api, MASTER_URL_STORAGE_KEY, normalizeBase, storageGet, storageSet } from "./api";
-import type { ClusterSummary, HistorySample, NodeRecord, RayStatus, Sample } from "./types";
+import type { ClusterSummary, HistorySample, JobResult, KernelRecord, NodeRecord, RayStatus, Sample } from "./types";
 
 const CONFIGURED_MASTER_URL = normalizeBase(process.env.NEXT_PUBLIC_MASTER_URL);
 const POLL_MS = 3000;
@@ -127,6 +127,49 @@ export function useNodeHistory(nodeId: string | null, minutes = 10, enabled = tr
     };
   }, [base, nodeId, minutes, enabled]);
   return samples;
+}
+
+/**
+ * Notebook runtimes and recent jobs, for the seat map and the active-workloads list.
+ * Polled only by the pages that use it (every 3 s, same cadence as the cluster poll).
+ */
+export function useWorkloads(enabled = true): {
+  kernels: KernelRecord[];
+  jobs: JobResult[];
+  error: string | null;
+  refresh: () => void;
+} {
+  const { base } = useCluster();
+  const [kernels, setKernels] = useState<KernelRecord[]>([]);
+  const [jobs, setJobs] = useState<JobResult[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [key, setKey] = useState(0);
+  useEffect(() => {
+    if (!enabled) return;
+    let alive = true;
+    async function load() {
+      try {
+        const [k, j] = await Promise.all([
+          api<KernelRecord[]>(base, "/api/v1/kernels"),
+          api<JobResult[]>(base, "/api/v1/jobs?limit=20"),
+        ]);
+        if (!alive) return;
+        setKernels(k);
+        setJobs(j);
+        setError(null);
+      } catch (e) {
+        if (alive) setError(e instanceof Error ? e.message : String(e));
+      }
+    }
+    load();
+    const id = setInterval(load, POLL_MS);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, [base, enabled, key]);
+  const refresh = useCallback(() => setKey((k) => k + 1), []);
+  return { kernels, jobs, error, refresh };
 }
 
 /** Sample scripts served by the Master (master/samples/*.py). */
