@@ -1,97 +1,168 @@
 "use client";
 
-import React, { useMemo } from "react";
-import NodeCard from "../components/NodeCard";
-import { Card, StatTile } from "../components/ui";
-import { useCluster } from "../lib/cluster";
-import { fmtNum } from "../lib/format";
+import { useRouter } from "next/navigation";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import AllocationPanel from "../components/cluster/AllocationPanel";
+import MachinePanel from "../components/cluster/MachinePanel";
+import OverviewCards from "../components/cluster/OverviewCards";
+import SeatMap from "../components/cluster/SeatMap";
+import Workloads from "../components/cluster/Workloads";
+import { IconRefresh } from "../components/icons";
+import PageHeader from "../components/PageHeader";
+import { Button } from "../components/ui";
+import { defaultCores, useCluster, useWorkloads } from "../lib/cluster";
+import { useConnectFlow } from "../lib/connect";
+import { clockTime } from "../lib/format";
+import { loadNotebooks } from "../lib/notebook";
+import { buildSeatMap, SEAT_GPU, toWorkloads } from "../lib/seats";
 
 export default function ClusterPage() {
-  const { nodes, summary, ray, loading, lastUpdated } = useCluster();
+  const router = useRouter();
+  const { base, nodes, summary, ray, loading, lastUpdated, refresh } = useCluster();
+  const work = useWorkloads();
+  const flow = useConnectFlow(base);
 
-  // Ray's per-IP GPU offer (the Master PC has two Ray nodes on one IP: head with 0 GPUs + its worker).
-  const rayByIp = useMemo(() => {
-    const m: Record<string, { total: number; nodes: number }> = {};
-    for (const n of ray?.nodes ?? []) {
-      if (!n.alive) continue;
-      const e = (m[n.ip] ??= { total: 0, nodes: 0 });
-      e.total += n.gpus;
-      e.nodes += 1;
+  const [mine, setMine] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    // Runtimes owned by notebooks in this browser are marked "You".
+    const ids = loadNotebooks().notebooks.map((n) => n.kernelId).filter(Boolean) as string[];
+    setMine(new Set(ids));
+  }, [work.kernels]);
+
+  const workloads = useMemo(() => toWorkloads(work.kernels, work.jobs, nodes, mine), [work.kernels, work.jobs, nodes, mine]);
+  const seatMap = useMemo(() => buildSeatMap(nodes, ray, workloads), [nodes, ray, workloads]);
+
+  const [selectedIp, setSelectedIp] = useState<string | null>(null);
+  const [seats, setSeats] = useState<number[]>([]);
+  const [cores, setCores] = useState(1);
+  const [drawer, setDrawer] = useState(false);
+  const [coresTouched, setCoresTouched] = useState(false);
+
+  // Default selection: the first online PC with free seats, else the first PC.
+  useEffect(() => {
+    if (selectedIp && seatMap.machines.some((m) => m.ip === selectedIp)) return;
+    const first = seatMap.machines.find((m) => m.online && m.freeSeats > 0) ?? seatMap.machines[0];
+    if (first) setSelectedIp(first.ip);
+  }, [seatMap.machines, selectedIp]);
+
+  const machine = seatMap.machines.find((m) => m.ip === selectedIp) ?? null;
+
+  // A seat that became taken (someone else's runtime) drops out of the selection.
+  useEffect(() => {
+    if (!machine) return;
+    setSeats((s) => {
+      const ok = s.filter((i) => i >= machine.takenSeats && i < machine.totalSeats);
+      return ok.length === s.length ? s : ok;
+    });
+  }, [machine]);
+
+  // Cores follow the GPU/CPU default until the user picks a value.
+  useEffect(() => {
+    if (!coresTouched) setCores(defaultCores(seats.length * SEAT_GPU));
+  }, [seats.length, coresTouched]);
+
+  const { busy, phase, reset } = flow;
+  const selectMachine = useCallback((ip: string) => {
+    if (busy) return;
+    if (ip !== selectedIp) {
+      setSelectedIp(ip);
+      setSeats([]);
+      if (phase === "error" || phase === "ready") reset();
     }
-    return m;
-  }, [ray]);
+  }, [busy, phase, reset, selectedIp]);
 
-  const rayGpuTotal = ray?.cluster_resources?.GPU ?? 0;
-  const rayGpuFree = ray?.available_resources?.GPU ?? 0;
+  const toggleSeat = useCallback((ip: string, seat: number) => {
+    if (busy) return;
+    if (phase === "error" || phase === "ready") reset();
+    if (ip !== selectedIp) {
+      setSelectedIp(ip);
+      setSeats([seat]);
+    } else {
+      setSeats((s) => (s.includes(seat) ? s.filter((x) => x !== seat) : [...s, seat].sort((a, b) => a - b)));
+    }
+  }, [busy, phase, reset, selectedIp]);
+
+  const openDetails = useCallback((ip: string) => {
+    selectMachine(ip);
+    setDrawer(true);
+  }, [selectMachine]);
+
+  useEffect(() => {
+    if (!drawer) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setDrawer(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [drawer]);
+
+  const connect = useCallback(() => {
+    if (!machine) return;
+    flow.start({ ip: machine.ip, hostname: machine.hostname, gpus: seats.length * SEAT_GPU, cpus: cores });
+  }, [machine, seats.length, cores, flow]);
+
+  const openNotebook = useCallback(() => {
+    const k = flow.kernel;
+    const r = flow.request;
+    if (!k || !r) return;
+    const q = new URLSearchParams({ kernel: k.kernel_id, target: r.ip, share: String(r.gpus), cores: String(r.cpus), name: `Notebook on ${r.hostname}` });
+    router.push(`/notebook?${q.toString()}`);
+  }, [flow.kernel, flow.request, router]);
+
+  const refreshAll = useCallback(() => {
+    refresh();
+    work.refresh();
+  }, [refresh, work]);
 
   return (
-    <main className="mx-auto max-w-[1600px] space-y-6 px-4 py-6 md:px-6">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-50">Cluster</h1>
-          <p className="text-xs text-slate-400">Live PyNVML telemetry from every node, every 5 s · charts keep the last 10 minutes</p>
-        </div>
-        {lastUpdated && <span className="text-[11px] text-slate-500">updated {new Date(lastUpdated).toLocaleTimeString()}</span>}
-      </div>
+    <div className="flex min-w-0 flex-1">
+      <main className="min-w-0 flex-1 space-y-6 px-4 py-6 md:px-8 md:py-8">
+        <PageHeader
+          title="Cluster overview"
+          subtitle="Every PC in the swarm, its free GPU seats and what is running. Pick seats to start a notebook on that GPU."
+          actions={
+            <>
+              {lastUpdated && <span className="hidden text-[12px] text-muted md:inline tabular">Updated {clockTime(lastUpdated)}</span>}
+              <Button variant="secondary" onClick={refreshAll} title="Refresh now" aria-label="Refresh cluster data">
+                <IconRefresh size={15} /> <span className="hidden sm:inline">Refresh</span>
+              </Button>
+            </>
+          }
+        />
 
-      {summary && (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-          <StatTile label="Nodes online" value={summary.active_nodes} sub={`of ${summary.total_nodes} registered${summary.offline_nodes ? ` · ${summary.offline_nodes} offline` : ""}`} />
-          <StatTile label="GPUs" value={summary.total_gpus} sub={`${summary.available_gpus} idle (< 40% load)`} accent="text-emerald-300" />
-          <StatTile label="Pooled VRAM" value={`${(summary.total_vram_gb - summary.used_vram_gb).toFixed(1)} GB`} sub={`free of ${summary.total_vram_gb} GB`} accent="text-cyan-300" />
-          <StatTile label="Avg GPU load" value={`${fmtNum(summary.avg_gpu_utilization_pct)}%`}
-            sub={`${fmtNum(summary.total_power_watts ?? 0)} W total${summary.max_temperature_c ? ` · hottest ${summary.max_temperature_c} °C` : ""}`} />
-          <StatTile label="CPU cores" value={ray ? `${fmtNum(ray.available_resources?.CPU ?? 0)} free` : "—"}
-            sub={ray ? `of ${fmtNum(ray.cluster_resources?.CPU ?? 0)} pooled from every PC` : undefined} accent="text-violet-300" />
-          <StatTile label="Work running" value={`${summary.running_jobs ?? 0} job${summary.running_jobs === 1 ? "" : "s"}`} sub={`${summary.active_kernels ?? 0} notebook runtime${summary.active_kernels === 1 ? "" : "s"}`} />
+        <OverviewCards summary={summary} seats={{ free: seatMap.freeSeats, total: seatMap.totalSeats }} rayConnected={seatMap.rayConnected} />
+
+        <SeatMap data={seatMap} selectedIp={selectedIp} selectedSeats={seats} loading={loading}
+          onSelectMachine={selectMachine} onToggleSeat={toggleSeat} onDetails={openDetails} />
+
+        <AllocationPanel
+          machine={machine}
+          seats={seats.length}
+          cores={cores}
+          setCores={(n) => { setCoresTouched(true); setCores(n); }}
+          onClearSeats={() => { setSeats([]); flow.reset(); }}
+          flow={flow}
+          onConnect={connect}
+          onOpen={openNotebook}
+          onCancel={flow.cancel}
+        />
+
+        <Workloads items={workloads} />
+      </main>
+
+      {/* Right machine panel: sticky on wide screens… */}
+      <aside aria-label="Machine details" className="thin-scroll sticky top-0 hidden h-screen w-[340px] shrink-0 overflow-y-auto border-l border-line bg-surface/50 xl:block">
+        <MachinePanel machine={machine} />
+      </aside>
+
+      {/* …a drawer below 1280 px. */}
+      {drawer && (
+        <div className="fixed inset-0 z-50 xl:hidden">
+          <button type="button" aria-label="Close machine details" className="absolute inset-0 h-full w-full animate-fade-in bg-canvas/70 backdrop-blur-sm" onClick={() => setDrawer(false)} />
+          <aside role="dialog" aria-modal="true" aria-label="Machine details"
+            className="thin-scroll absolute inset-y-0 right-0 w-[min(360px,92vw)] animate-drawer-in overflow-y-auto border-l border-line bg-surface pop-shadow">
+            <MachinePanel machine={machine} onClose={() => setDrawer(false)} />
+          </aside>
         </div>
       )}
-
-      {/* Ray scheduler view: logical GPUs the scheduler can still hand out */}
-      <Card className="p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-100">Ray scheduler</h2>
-            <p className="text-[11px] text-slate-400">
-              {ray?.connected
-                ? "Logical GPU shares: a notebook runtime or job holds its share until it finishes or is stopped."
-                : "The Master API is not connected to Ray yet (jobs and notebooks unavailable)."}
-            </p>
-          </div>
-          {ray?.connected && (
-            <div className="flex flex-wrap items-center gap-4 text-xs">
-              <span className="text-slate-300">
-                <span className="font-mono text-lg text-slate-50">{fmtNum(rayGpuFree, 2)}</span> / {fmtNum(rayGpuTotal, 2)} GPU free
-              </span>
-              <span className="text-slate-400">{fmtNum(ray.available_resources?.CPU ?? 0)} / {fmtNum(ray.cluster_resources?.CPU ?? 0)} CPU free</span>
-              <span className="text-slate-400">{ray.nodes.filter((n) => n.alive).length} Ray nodes</span>
-            </div>
-          )}
-        </div>
-        {ray?.connected && rayGpuTotal > 0 && (
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800" role="meter" aria-label="GPU shares in use"
-            aria-valuenow={Math.round(((rayGpuTotal - rayGpuFree) / rayGpuTotal) * 100)} aria-valuemin={0} aria-valuemax={100}>
-            <div className="h-2 rounded-full" style={{ width: `${((rayGpuTotal - rayGpuFree) / rayGpuTotal) * 100}%`, background: "var(--viz-series)" }} />
-          </div>
-        )}
-      </Card>
-
-      <section className="space-y-4">
-        {loading ? (
-          <div className="py-16 text-center font-mono text-sm text-slate-500">Discovering nodes on the Tailscale mesh…</div>
-        ) : nodes.length === 0 ? (
-          <Card className="border-dashed p-12 text-center">
-            <p className="font-semibold text-slate-300">No nodes have reported yet</p>
-            <p className="mx-auto mt-2 max-w-lg text-xs text-slate-500">
-              Start <code className="text-emerald-300">master\start_master.cmd</code> on the Master PC (it also starts that PC&apos;s worker), then{" "}
-              <code className="text-emerald-300">worker\start_worker.cmd &lt;MASTER_IP&gt;</code> on every other PC. Linux:{" "}
-              <code className="text-emerald-300">sudo ./start_worker.sh &lt;MASTER_IP&gt;</code>.
-            </p>
-          </Card>
-        ) : (
-          nodes.map((n) => <NodeCard key={n.node_id} node={n} rayGpus={rayByIp[n.tailscale_ip]} />)
-        )}
-      </section>
-    </main>
+    </div>
   );
 }

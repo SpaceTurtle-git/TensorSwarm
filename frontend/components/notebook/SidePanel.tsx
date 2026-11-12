@@ -23,11 +23,11 @@ export default function SidePanel({
 }) {
   const [tab, setTab] = useState<Tab>("runtime");
   return (
-    <aside className="flex h-full min-h-0 flex-col rounded-xl border border-slate-800 bg-slate-900/60">
-      <div className="flex border-b border-slate-800 text-xs" role="tablist">
+    <aside className="flex h-full min-h-0 flex-col rounded-xl border border-line bg-surface/60">
+      <div className="flex border-b border-line text-xs" role="tablist">
         {(["runtime", "variables", "data", "samples", "shortcuts"] as const).map((t) => (
           <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
-            className={`-mb-px flex-1 border-b-2 px-2 py-2 capitalize ${tab === t ? "border-emerald-400 text-slate-100" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
+            className={`-mb-px flex-1 border-b-2 px-2 py-2 capitalize ${tab === t ? "border-accent text-fg" : "border-transparent text-muted hover:text-fg"}`}>
             {t}
           </button>
         ))}
@@ -73,12 +73,12 @@ function RuntimeTab({ kernel, kernelError }: { kernel: KernelRecord | null; kern
 
   if (!kernel) {
     return (
-      <div className="space-y-4 text-xs text-slate-400">
+      <div className="space-y-4 text-xs text-muted">
         <div className="space-y-2">
-          <p className="text-sm text-slate-200">Not connected</p>
+          <p className="text-sm text-fg">Not connected</p>
           <p>Click <b>Connect</b> (top right) to start a Python runtime on a worker's GPU, or <b>CPU only</b> on any PC (also PCs without a GPU). Or just run a cell: it connects automatically.</p>
           <p>The runtime keeps your variables between cells, like Colab. It reserves its GPU share and CPU cores until you disconnect, and stops by itself after an hour without activity.</p>
-          {kernelError && <p className="rounded border border-rose-900 bg-rose-950/40 p-2 text-rose-300">{kernelError}</p>}
+          {kernelError && <p className="rounded border border-danger/40 bg-danger/10 p-2 text-danger-fg">{kernelError}</p>}
         </div>
         <ActiveRuntimes currentId={null} />
       </div>
@@ -91,13 +91,13 @@ function RuntimeTab({ kernel, kernelError }: { kernel: KernelRecord | null; kern
       <ActiveRuntimes currentId={kernel.kernel_id} />
       <div className="flex items-center justify-between">
         <StatusPill status={kernel.status} />
-        <span className="font-mono text-[10px] text-slate-500">{kernel.kernel_id}</span>
+        <span className="font-mono text-[10px] text-muted">{kernel.kernel_id}</span>
       </div>
       {kernel.status === "STARTING" && (
-        <p className="text-xs text-slate-400">Starting Python on {kernel.target_node_ip || (kernel.num_gpus > 0 ? "a free GPU" : "a PC with free CPU cores")}… the first start on a node imports PyTorch and can take ~10-30 s.</p>
+        <p className="text-xs text-muted">Starting Python on {kernel.target_node_ip || (kernel.num_gpus > 0 ? "a free GPU" : "a PC with free CPU cores")}… the first start on a node imports PyTorch and can take ~10-30 s.</p>
       )}
       {(kernel.status === "ERROR" || kernel.status === "DEAD") && kernel.error && (
-        <p className="rounded border border-rose-900 bg-rose-950/40 p-2 text-xs text-rose-300">{kernel.error}</p>
+        <p className="rounded border border-danger/40 bg-danger/10 p-2 text-xs text-danger-fg">{kernel.error}</p>
       )}
       {info && (
         <div>
@@ -112,15 +112,15 @@ function RuntimeTab({ kernel, kernelError }: { kernel: KernelRecord | null; kern
       )}
       {gpu && (
         <div className="space-y-3">
-          <h4 className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Live GPU ({node?.hostname})</h4>
+          <h4 className="text-[11px] font-medium uppercase tracking-wider text-muted">Live GPU ({node?.hostname})</h4>
           <Meter label="Core load" value={gpu.gpu_utilization_pct} detail={`${fmtNum(gpu.gpu_utilization_pct)}%`} />
           <Meter label="VRAM (whole GPU)" value={pct(gpu.used_vram_mb, gpu.total_vram_mb)} level={loadLevel(pct(gpu.used_vram_mb, gpu.total_vram_mb))}
             detail={`${fmtMB(gpu.used_vram_mb)} / ${fmtMB(gpu.total_vram_mb)}`} />
-          <div className="flex items-center justify-between text-xs text-slate-300">
+          <div className="flex items-center justify-between text-xs text-fg/85">
             <span>Temperature</span>
             <span className="flex items-center gap-2 font-mono">{fmtNum(gpu.temperature_c, 0, " °C")}{tempLevel(gpu.temperature_c) !== "good" && <LevelBadge level={tempLevel(gpu.temperature_c)} />}</span>
           </div>
-          <div className="flex items-center justify-between text-xs text-slate-300">
+          <div className="flex items-center justify-between text-xs text-fg/85">
             <span>Power</span>
             <span className="font-mono">{fmtNum(gpu.power_watts, 1, " W")}{gpu.power_limit_watts ? ` / ${gpu.power_limit_watts} W` : ""}</span>
           </div>
@@ -129,11 +129,11 @@ function RuntimeTab({ kernel, kernelError }: { kernel: KernelRecord | null; kern
       )}
       {torchMem.allocated_mb !== undefined && (
         <div>
-          <h4 className="mb-1 text-[11px] font-medium uppercase tracking-wider text-slate-400">This runtime (PyTorch)</h4>
+          <h4 className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted">This runtime (PyTorch)</h4>
           <KV k="Tensors allocated" v={fmtMB(torchMem.allocated_mb)} />
           <KV k="Reserved by caching allocator" v={fmtMB(torchMem.reserved_mb)} />
           <KV k="Free on device" v={`${fmtMB(torchMem.device_free_mb)} of ${fmtMB(torchMem.device_total_mb)}`} />
-          <p className="mt-1 text-[10.5px] text-slate-500">Run <code>torch.cuda.empty_cache()</code> to hand reserved memory back, or restart the runtime.</p>
+          <p className="mt-1 text-[10.5px] text-muted">Run <code>torch.cuda.empty_cache()</code> to hand reserved memory back, or restart the runtime.</p>
         </div>
       )}
     </div>
@@ -160,13 +160,13 @@ function ActiveRuntimes({ currentId }: { currentId: string | null }) {
 
   if (!list.length) return null;
   return (
-    <div className="rounded-lg border border-amber-900/60 bg-amber-950/20 p-2.5">
-      <h4 className="text-[11px] font-medium uppercase tracking-wider text-amber-200/90">Other active runtimes ({list.length})</h4>
-      <p className="mt-0.5 text-[10.5px] text-slate-400">Each holds its GPU share and CPU cores until stopped. Stop one to free them.</p>
+    <div className="rounded-lg border border-warn/40 bg-warn/20 p-2.5">
+      <h4 className="text-[11px] font-medium uppercase tracking-wider text-warn-fg">Other active runtimes ({list.length})</h4>
+      <p className="mt-0.5 text-[10.5px] text-muted">Each holds its GPU share and CPU cores until stopped. Stop one to free them.</p>
       <div className="mt-2 space-y-1.5">
         {list.map((k) => (
           <div key={k.kernel_id} className="flex items-center justify-between gap-2 text-[11px]">
-            <span className="min-w-0 truncate text-slate-300" title={k.kernel_id}>
+            <span className="min-w-0 truncate text-fg/85" title={k.kernel_id}>
               {k.name || k.kernel_id} · {k.info?.hostname ?? k.target_node_ip ?? "…"} · {k.num_gpus > 0 ? `${k.num_gpus} GPU` : "CPU"} · {k.num_cpus ?? 1} core(s)
             </span>
             <button
@@ -177,7 +177,7 @@ function ActiveRuntimes({ currentId }: { currentId: string | null }) {
                 setBusy(null);
                 load();
               }}
-              className="shrink-0 rounded border border-slate-700 px-2 py-0.5 text-slate-200 hover:border-rose-500 hover:text-rose-200 disabled:opacity-40"
+              className="shrink-0 rounded border border-line-strong px-2 py-0.5 text-fg hover:border-danger hover:text-danger-fg disabled:opacity-40"
             >
               {busy === k.kernel_id ? "Stopping…" : "Stop"}
             </button>
@@ -204,22 +204,22 @@ function VariablesTab({ kernel, version }: { kernel: KernelRecord | null; versio
 
   useEffect(() => { load(); }, [load, version]);
 
-  if (!ready) return <p className="text-xs text-slate-400">Connect a runtime to inspect its variables.</p>;
+  if (!ready) return <p className="text-xs text-muted">Connect a runtime to inspect its variables.</p>;
   const shown = vars.filter((v) => v.name.toLowerCase().includes(filter.toLowerCase()));
   return (
     <div className="space-y-2">
       <div className="flex gap-2">
         <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter"
-          className="min-w-0 flex-1 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500" />
+          className="min-w-0 flex-1 rounded border border-line-strong bg-canvas px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-accent" />
         <Button onClick={load}>Refresh</Button>
       </div>
-      {err && <p className="text-xs text-rose-300">{err}</p>}
+      {err && <p className="text-xs text-danger-fg">{err}</p>}
       {shown.length === 0 ? (
-        <p className="text-xs text-slate-500">No variables yet. Run a cell that assigns something.</p>
+        <p className="text-xs text-muted">No variables yet. Run a cell that assigns something.</p>
       ) : (
         <table className="w-full table-fixed text-[11px]">
           <thead>
-            <tr className="text-left text-[10px] uppercase tracking-wider text-slate-500">
+            <tr className="text-left text-[10px] uppercase tracking-wider text-muted">
               <th className="w-1/4 py-1 font-medium">Name</th>
               <th className="w-1/4 py-1 font-medium">Type</th>
               <th className="py-1 font-medium">Value</th>
@@ -227,10 +227,10 @@ function VariablesTab({ kernel, version }: { kernel: KernelRecord | null; versio
           </thead>
           <tbody>
             {shown.map((v) => (
-              <tr key={v.name} className="border-t border-slate-800/70 align-top">
-                <td className="truncate py-1 pr-1 font-mono text-emerald-300" title={v.name}>{v.name}</td>
-                <td className="truncate py-1 pr-1 text-slate-400" title={v.type}>{v.type}</td>
-                <td className="break-words py-1 font-mono text-slate-300">{v.summary}</td>
+              <tr key={v.name} className="border-t border-line/70 align-top">
+                <td className="truncate py-1 pr-1 font-mono text-fg" title={v.name}>{v.name}</td>
+                <td className="truncate py-1 pr-1 text-muted" title={v.type}>{v.type}</td>
+                <td className="break-words py-1 font-mono text-fg/85">{v.summary}</td>
               </tr>
             ))}
           </tbody>
@@ -254,26 +254,26 @@ function DataTab({ kernel, onInsert }: { kernel: KernelRecord | null; onInsert: 
   }, [base]);
   const ip = kernel?.status === "READY" ? kernel.target_node_ip : null;
   const host = nodes.find((n) => n.tailscale_ip === ip)?.hostname;
-  if (err) return <p className="text-xs text-rose-300">Could not load datasets: {err}</p>;
-  if (!list) return <p className="text-xs text-slate-500">Loading datasets…</p>;
+  if (err) return <p className="text-xs text-danger-fg">Could not load datasets: {err}</p>;
+  if (!list) return <p className="text-xs text-muted">Loading datasets…</p>;
   const latest = list.filter((d) => d.latest);
   return (
     <div className="space-y-2">
-      <p className="text-[11px] text-slate-400">
-        <code className="text-emerald-300">ts.dataset(&quot;name&quot;)</code> returns the dataset folder on the worker.
-        {ip ? <> Marked <span className="text-emerald-300">ready</span> = already on {host || ip}, no copy needed.</> : " Connect a runtime to see which datasets its PC already has."}
+      <p className="text-[11px] text-muted">
+        <code className="font-mono text-fg">ts.dataset(&quot;name&quot;)</code> returns the dataset folder on the worker.
+        {ip ? <> Marked <span className="text-ok-fg">ready</span> = already on {host || ip}, no copy needed.</> : " Connect a runtime to see which datasets its PC already has."}
       </p>
-      {!latest.length && <p className="text-xs text-slate-500">No datasets yet. Upload one in the <a href="/datasets" className="underline">Datasets</a> tab.</p>}
+      {!latest.length && <p className="text-xs text-muted">No datasets yet. Upload one in the <a href="/datasets" className="underline">Datasets</a> tab.</p>}
       {latest.map((d) => {
         const local = ip ? d.nodes.some((n) => n.ip === ip) : false;
         const code = datasetSnippet(d);
         return (
-          <div key={d.id} className="rounded-lg border border-slate-800 bg-slate-950/50 p-2.5">
+          <div key={d.id} className="rounded-lg border border-line bg-canvas/50 p-2.5">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="truncate text-xs font-medium text-slate-100">{d.name}</span>
-              <span className="shrink-0 text-[10px] text-slate-500">{fmtBytes(d.total_bytes)}{ip ? (local ? " · ✓ ready" : " · will copy") : ""}</span>
+              <span className="truncate text-xs font-medium text-fg">{d.name}</span>
+              <span className="shrink-0 text-[10px] text-muted">{fmtBytes(d.total_bytes)}{ip ? (local ? " · ✓ ready" : " · will copy") : ""}</span>
             </div>
-            <code className="mt-1 block truncate font-mono text-[10px] text-emerald-300" title={code}>{code}</code>
+            <code className="mt-1 block truncate font-mono text-[11px] text-fg" title={code}>{code}</code>
             <div className="mt-2 flex gap-1.5">
               <Button onClick={() => onInsert(code)}>Insert cell</Button>
               <Button variant="ghost" onClick={async () => { if (await copyText(code)) { setCopied(d.id); setTimeout(() => setCopied(null), 1200); } }}>
@@ -289,18 +289,18 @@ function DataTab({ kernel, onInsert }: { kernel: KernelRecord | null; onInsert: 
 
 function SamplesTab({ onInsert, onOpen }: { onInsert: (s: Sample) => void; onOpen: (s: Sample) => void }) {
   const { samples, error } = useSamples();
-  if (error) return <p className="text-xs text-rose-300">Could not load samples: {error}</p>;
-  if (!samples.length) return <p className="text-xs text-slate-500">Loading samples…</p>;
+  if (error) return <p className="text-xs text-danger-fg">Could not load samples: {error}</p>;
+  if (!samples.length) return <p className="text-xs text-muted">Loading samples…</p>;
   return (
     <div className="space-y-2">
-      <p className="text-[11px] text-slate-400">Test scripts for worker nodes. Open one as its own notebook, or insert its cells here.</p>
+      <p className="text-[11px] text-muted">Test scripts for worker nodes. Open one as its own notebook, or insert its cells here.</p>
       {samples.map((s) => (
-        <div key={s.id} className="rounded-lg border border-slate-800 bg-slate-950/50 p-2.5">
+        <div key={s.id} className="rounded-lg border border-line bg-canvas/50 p-2.5">
           <div className="flex items-baseline justify-between gap-2">
-            <span className="text-xs font-medium text-slate-100">{s.title}</span>
-            <span className="shrink-0 text-[10px] text-slate-500">{s.runtime}</span>
+            <span className="text-xs font-medium text-fg">{s.title}</span>
+            <span className="shrink-0 text-[10px] text-muted">{s.runtime}</span>
           </div>
-          <p className="mt-0.5 text-[11px] leading-snug text-slate-400">{s.description}</p>
+          <p className="mt-0.5 text-[11px] leading-snug text-muted">{s.description}</p>
           <div className="mt-2 flex gap-1.5">
             <Button onClick={() => onOpen(s)}>Open</Button>
             <Button variant="ghost" onClick={() => onInsert(s)}>Insert cells</Button>
@@ -329,9 +329,9 @@ function ShortcutsTab() {
     <table className="w-full text-[11px]">
       <tbody>
         {rows.map(([k, v]) => (
-          <tr key={k} className="border-b border-slate-800/60">
-            <td className="whitespace-nowrap py-1.5 pr-3 font-mono text-emerald-300">{k}</td>
-            <td className="py-1.5 text-slate-300">{v}</td>
+          <tr key={k} className="border-b border-line/60">
+            <td className="whitespace-nowrap py-1.5 pr-3 font-mono text-fg">{k}</td>
+            <td className="py-1.5 text-fg/85">{v}</td>
           </tr>
         ))}
       </tbody>
