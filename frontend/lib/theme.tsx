@@ -43,7 +43,7 @@ function canvasColorOf(t: Theme): string {
   document.body.appendChild(probe);
   const rgb = getComputedStyle(probe).getPropertyValue("--canvas").trim();
   probe.remove();
-  return rgb ? `rgb(${rgb})` : t === "light" ? "#F4F8F5" : "#091815";
+  return rgb ? `rgb(${rgb})` : t === "light" ? "#F5F7FB" : "#091815";
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
@@ -100,7 +100,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       flushSync(() => setTheme(next));
     };
 
-    runInkTransition({ origin, apply, reverse: next === "dark", targetCanvas: canvasColorOf(next) })
+    // Light -> dark: Dark Emerald ink spreads from the dial. Dark -> light: it retracts into it.
+    runInkTransition({ origin, apply, reverse: next === "light", targetCanvas: canvasColorOf(next), live: from ?? undefined })
       .catch(() => apply())
       .finally(() => {
         busy.current = false;

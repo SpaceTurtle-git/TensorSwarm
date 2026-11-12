@@ -587,6 +587,12 @@ def _usable_gpu_name(torch_mod) -> Optional[str]:
 
 def _apply_cpu_threads(threads: Optional[float]) -> int:
     """Use the reserved cores: PyTorch (and BLAS via OMP) run this many threads."""
+    # Ray hides the GPU from 0-GPU work with CUDA_VISIBLE_DEVICES="", but Windows cannot hold an
+    # empty variable (it is deleted), so CUDA still sees the GPU while torch counts none:
+    # torch.cuda.is_available() says True and every CUDA call fails with "Invalid device id".
+    # "-1" means "no devices" to both, so CPU-only runtimes and jobs fall back to the CPU cleanly.
+    if os.environ.get("CUDA_VISIBLE_DEVICES") == "":
+        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
     n = max(1, int(threads or 1))
     os.environ["OMP_NUM_THREADS"] = str(n)
     os.environ["MKL_NUM_THREADS"] = str(n)

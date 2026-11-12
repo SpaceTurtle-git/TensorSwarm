@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { useCluster } from "../lib/cluster";
+import { useRuntime } from "../lib/runtime";
 import { IconCluster, IconClose, IconDatasets, IconJobs, IconMenu, IconNotebook } from "./icons";
 
 const LINKS = [
@@ -102,11 +103,13 @@ function MasterCard() {
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const path = usePathname();
   const activeIndex = LINKS.findIndex((l) => isActive(path, l.href));
+  const runtime = useRuntime();
+  const rtLabel = runtime.kernelId && runtime.spec ? (runtime.spec.gpus > 0 ? "GPU" : "CPU") : null;
   return (
     <nav aria-label="Main" className="relative">
       {activeIndex >= 0 && (
         <span aria-hidden="true"
-          className="absolute left-0 right-0 top-0 rounded-[10px] border border-line bg-elevated/80 transition-transform duration-200 ease-out-expo"
+          className="absolute left-0 right-0 top-0 rounded-[10px] border border-line bg-accent-soft transition-transform duration-200 ease-out-expo"
           style={{ height: ITEM_H, transform: `translateY(${activeIndex * (ITEM_H + ITEM_GAP)}px)` }}>
           <span className="absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-accent" />
         </span>
@@ -121,6 +124,13 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
                 style={{ height: ITEM_H }}>
                 <Icon size={18} className={active ? "text-accent" : ""} />
                 {label}
+                {href === "/notebook" && rtLabel && (
+                  <span className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-line px-2 py-0.5 text-[11px] font-medium text-fg/85"
+                    title={runtime.ready ? `Your runtime on ${runtime.spec?.hostname} is ready` : `Your runtime on ${runtime.spec?.hostname} is starting`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${runtime.ready ? "bg-ok" : "bg-accent"}`} aria-hidden="true" />
+                    {rtLabel}<span className="sr-only">{runtime.ready ? " runtime ready" : " runtime starting"}</span>
+                  </span>
+                )}
               </Link>
             </li>
           );
@@ -168,7 +178,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-[236px] shrink-0 border-r border-line bg-surface/55 backdrop-blur-[2px] lg:block">
+      <aside className="sticky top-0 hidden h-screen w-[236px] shrink-0 border-r border-line glass-border glass-sidebar lg:block">
         <SidebarBody />
       </aside>
 
@@ -176,7 +186,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {drawer && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button type="button" aria-label="Close menu" className="absolute inset-0 h-full w-full animate-fade-in bg-canvas/70 backdrop-blur-sm" onClick={() => setDrawer(false)} />
-          <aside role="dialog" aria-modal="true" aria-label="Navigation" className="absolute inset-y-0 left-0 w-[272px] animate-drawer-in-left border-r border-line bg-surface pop-shadow">
+          <aside role="dialog" aria-modal="true" aria-label="Navigation" className="absolute inset-y-0 left-0 w-[272px] animate-drawer-in-left border-r border-line glass-border glass-sidebar pop-shadow">
             <button type="button" onClick={() => setDrawer(false)} aria-label="Close menu"
               className="absolute right-3 top-4 inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-fg/[0.06] hover:text-fg">
               <IconClose size={18} />
@@ -188,7 +198,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile top bar */}
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-line bg-canvas/85 px-3 backdrop-blur lg:hidden">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-line glass-border glass px-3 lg:hidden">
           <button type="button" onClick={() => setDrawer(true)} aria-label="Open menu" aria-expanded={drawer}
             className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-fg hover:bg-fg/[0.06]">
             <IconMenu size={20} />

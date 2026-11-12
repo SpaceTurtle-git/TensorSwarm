@@ -8,8 +8,8 @@ import { IconAlert, IconCheck, IconClock, IconX } from "./icons";
 export function Card({ className = "", tone = "surface", children, ...rest }: {
   className?: string; tone?: "surface" | "elevated"; children: React.ReactNode;
 } & React.HTMLAttributes<HTMLDivElement>) {
-  const bg = tone === "elevated" ? "bg-elevated" : "bg-surface/80";
-  return <div className={`rounded-2xl border border-line ${bg} panel-shadow ${className}`} {...rest}>{children}</div>;
+  const bg = tone === "elevated" ? "glass-elevated" : "glass";
+  return <div className={`rounded-2xl border border-line glass-border ${bg} ${className}`} {...rest}>{children}</div>;
 }
 
 export function SectionTitle({ children, aside, id }: { children: React.ReactNode; aside?: React.ReactNode; id?: string }) {
@@ -154,10 +154,10 @@ export function Button({
   disabled?: boolean; title?: string; type?: "button" | "submit"; className?: string;
 } & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "onClick" | "type">) {
   const styles = {
-    primary: "bg-accent text-accent-fg font-semibold hover:bg-accent-hover shadow-[0_1px_0_rgb(255_255_255/0.25)_inset]",
-    secondary: "border border-line bg-elevated/80 text-fg hover:border-line-strong hover:bg-elevated",
+    primary: "bg-accent text-accent-fg font-semibold hover:bg-accent-hover shadow-[0_1px_0_rgb(255_255_255/0.25)_inset] disabled:bg-line disabled:text-muted disabled:opacity-100 disabled:shadow-none",
+    secondary: "border border-line bg-elevated/80 text-fg hover:border-line-strong hover:bg-elevated disabled:bg-surface disabled:text-muted disabled:opacity-100",
     danger: "border border-danger/45 bg-danger/10 text-danger-fg hover:bg-danger/15",
-    ghost: "text-fg/85 hover:bg-fg/[0.06] hover:text-fg",
+    ghost: "text-fg/85 hover:bg-fg/[0.06] hover:text-fg disabled:text-muted disabled:opacity-70",
   }[variant];
   return (
     <button type={type} onClick={onClick} disabled={disabled} title={title} {...rest}

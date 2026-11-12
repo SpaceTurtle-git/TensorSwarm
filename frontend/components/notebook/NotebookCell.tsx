@@ -91,7 +91,7 @@ export default function NotebookCell({ cell, active, autoFocus = false, actions 
           <>
             <RunButton cell={cell} onRun={actions.onRun} />
             <div className="min-w-0 flex-1 py-1 pr-2">
-              <div className="rounded-md bg-canvas/60">
+              <div className="rounded-lg border border-line/80 bg-elevated">
                 <CodeEditor
                   value={cell.source}
                   onChange={actions.onChange}
@@ -114,7 +114,7 @@ export default function NotebookCell({ cell, active, autoFocus = false, actions 
         ) : (
           <div className="min-w-0 flex-1 py-1 pl-12 pr-2">
             {editingMd ? (
-              <div className="rounded-md bg-canvas/60">
+              <div className="rounded-lg border border-line/80 bg-elevated">
                 <CodeEditor
                   value={cell.source}
                   onChange={actions.onChange}

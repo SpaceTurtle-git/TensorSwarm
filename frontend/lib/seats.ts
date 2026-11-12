@@ -43,6 +43,9 @@ export interface MachineSeats {
   freeSeats: number;
   /** CPU cores this PC offers to Ray; null while Ray status is unknown. */
   cpus: number | null;
+  /** CPU "seats" (1 seat = 1 core) held by active runtimes and jobs on this PC. */
+  takenCores: number;
+  freeCores: number;
   workloads: Workload[];
 }
 
@@ -107,8 +110,10 @@ export function buildSeatMap(nodes: NodeRecord[], ray: RayStatus | null, workloa
 
   const active = workloads.filter(isActive);
   const heldByIp = new Map<string, number>();
+  const coresByIp = new Map<string, number>();
   let placed = 0;
   for (const w of active) {
+    if (w.ip) coresByIp.set(w.ip, (coresByIp.get(w.ip) ?? 0) + (w.cpus ?? 1));   // Ray's default is 1 core
     if (!w.ip || w.gpus <= 0) continue;
     heldByIp.set(w.ip, (heldByIp.get(w.ip) ?? 0) + w.gpus);
     placed += w.gpus;
@@ -129,10 +134,12 @@ export function buildSeatMap(nodes: NodeRecord[], ray: RayStatus | null, workloa
     const held = heldByIp.get(n.tailscale_ip) ?? 0;
     const takenSeats = online && inRay ? Math.min(totalSeats, Math.round(held / SEAT_GPU)) : 0;
     const freeSeats = online && inRay ? totalSeats - takenSeats : 0;
+    const cpus = rayConnected ? cpusByIp.get(n.tailscale_ip) ?? 0 : n.system?.cpu_cores_logical ?? null;
+    const takenCores = online && inRay ? Math.min(cpus ?? 0, coresByIp.get(n.tailscale_ip) ?? 0) : 0;
     machines.push({
       ip: n.tailscale_ip, node: n, hostname: n.hostname, online, inRay,
       hasGpu: gpuCount > 0, gpuCount, totalSeats, takenSeats, freeSeats,
-      cpus: rayConnected ? cpusByIp.get(n.tailscale_ip) ?? 0 : n.system?.cpu_cores_logical ?? null,
+      cpus, takenCores, freeCores: online && inRay ? Math.max(0, (cpus ?? 0) - takenCores) : 0,
       workloads: active.filter((w) => w.ip === n.tailscale_ip),
     });
   }
@@ -152,8 +159,10 @@ export function buildSeatMap(nodes: NodeRecord[], ray: RayStatus | null, workloa
 }
 
 /** Ray rule: a share above one GPU must be a whole number of GPUs. */
-export function seatSelectionProblem(seats: number, machine: MachineSeats | null): string | null {
-  if (!machine || seats === 0) return null;
+export function seatSelectionProblem(seats: number, machine: MachineSeats | null, cores = 0): string | null {
+  if (!machine) return null;
+  if (cores > machine.freeCores) return `Only ${machine.freeCores} core${machine.freeCores === 1 ? " is" : "s are"} free on ${machine.hostname}.`;
+  if (seats === 0) return null;
   if (seats > machine.freeSeats) return `Only ${machine.freeSeats} seat${machine.freeSeats === 1 ? " is" : "s are"} free on ${machine.hostname}.`;
   if (seats > SEATS_PER_GPU && seats % SEATS_PER_GPU !== 0)
     return "Above one GPU, pick whole GPUs (4, 8 … seats): Ray cannot split a share across GPUs.";

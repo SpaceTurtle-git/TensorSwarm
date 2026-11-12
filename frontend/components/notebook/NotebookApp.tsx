@@ -3,16 +3,17 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, postJson } from "../../lib/api";
-import { defaultCores, useCluster, useSamples } from "../../lib/cluster";
+import { useCluster, useSamples } from "../../lib/cluster";
 import { fmtMB, pct } from "../../lib/format";
 import {
   type Cell, type CellStatus, type Notebook, download, fromIpynb, fromPercentPy, loadNotebooks, newCell,
   newNotebook, saveNotebooks, toIpynb, toPercentPy, toScript,
 } from "../../lib/notebook";
-import { useRuntime } from "../../lib/runtime";
+import { describeSpec, useRuntime, type RuntimeSpec } from "../../lib/runtime";
 import type { ExecutionPoll, JobResult, Sample } from "../../lib/types";
 import { IconClose, IconJobs, IconRefresh, IconStop } from "../icons";
 import PageHeader from "../PageHeader";
+import RuntimeProgress from "../RuntimeProgress";
 import { Button, StatusPill } from "../ui";
 import ConnectDialog from "./ConnectDialog";
 import NotebookCell from "./NotebookCell";
@@ -29,7 +30,7 @@ interface Store { notebooks: Notebook[]; activeId: string }
 
 const WELCOME = (): Notebook =>
   newNotebook("Welcome", [
-    newCell("markdown", "# TensorSwarm notebook\nCells run in a **persistent Python runtime on a worker's GPU** (or CPU only, on any PC). Press **Shift+Enter** to run a cell. Open the *Samples* tab on the right for ready-made tests, and the *Data* tab for datasets. `ts.map(fn, items)` spreads work over the CPU cores of every PC."),
+    newCell("markdown", "# TensorSwarm notebook\nCells run in a **persistent Python runtime on a worker's GPU** (or CPU only, on any PC). Press **Connect** to pick GPU seats or CPU cores, then **Shift+Enter** to run a cell. Open the *Samples* tab on the right for ready-made tests, and the *Data* tab for datasets. `ts.map(fn, items)` spreads work over the CPU cores of every PC."),
     newCell("code", 'import torch, socket\nprint("Running on", socket.gethostname())\nprint("GPU:", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "none (CPU)")'),
     newCell("code", "x = torch.randn(4096, 4096, device=\"cuda\" if torch.cuda.is_available() else \"cpu\")\n(x @ x).norm()"),
   ]);
@@ -62,27 +63,7 @@ export default function NotebookApp() {
   useEffect(() => {
     const { notebooks, activeId } = loadNotebooks();
     const nbs = notebooks.length ? notebooks : [WELCOME()];
-    let active = activeId && nbs.some((n) => n.id === activeId) ? activeId : nbs[0].id;
-    const target = params.get("target");
-    const kernelParam = params.get("kernel");
-    const attached = kernelParam ? nbs.find((n) => n.kernelId === kernelParam) : undefined;
-    if (attached) {
-      // Reload of a page opened from the Cluster page: reuse that notebook.
-      active = attached.id;
-    } else if (target || kernelParam) {
-      const nb = newNotebook(params.get("name") || `Notebook on ${target}`);
-      nb.target = target ?? "";
-      if (kernelParam) {
-        // A runtime the Cluster page already started (seats picked there): attach to it.
-        nb.kernelId = kernelParam;
-        const share = params.has("share") ? Number(params.get("share")) : NaN;
-        const cores = params.has("cores") ? Number(params.get("cores")) : NaN;
-        if (Number.isFinite(share) && share >= 0) nb.gpuShare = share;
-        if (Number.isFinite(cores) && cores > 0) nb.cpuCores = cores;
-      }
-      nbs.unshift(nb);
-      active = nb.id;
-    }
+    const active = activeId && nbs.some((n) => n.id === activeId) ? activeId : nbs[0].id;
     setStore({ notebooks: nbs, activeId: active });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -107,23 +88,45 @@ export default function NotebookApp() {
   }, [updateNb]);
 
   // ---------------------------------------------------------------- runtime
-  const activeId = store?.activeId ?? null;
-  const setKernelId = useCallback((id: string | null) => {
-    if (activeId) updateNb(activeId, (n) => ({ ...n, kernelId: id }));
-  }, [activeId, updateNb]);
-  const runtime = useRuntime(base, nb?.kernelId ?? null, setKernelId);
+  // One runtime per browser (lib/runtime.ts), shared by every page: it follows the open notebook.
+  const runtime = useRuntime();
   const kernel = runtime.kernel;
 
-  const connect = useCallback(async (target: string, share: number, cores: number) => {
-    if (!nb) return;
-    updateNb(nb.id, (n) => ({ ...n, target, gpuShare: share, cpuCores: cores }));
-    try {
-      if (kernel && (kernel.status === "READY" || kernel.status === "STARTING")) await runtime.disconnect();
-      await runtime.connect(target, share, nb.name, cores);
-    } catch (e) {
-      runtime.setError(e instanceof Error ? e.message : String(e));
+  // Cells still running on a runtime that is being replaced or released can never finish.
+  const abandonExecs = useCallback(() => {
+    for (const e of Array.from(execs.current.values())) {
+      updateCell(e.nbId, e.cellId, (c) => ({ ...c, status: c.status === "running" || c.status === "queued" ? "cancelled" : c.status }));
     }
-  }, [nb, kernel, runtime, updateNb]);
+    execs.current.clear();
+  }, [updateCell]);
+
+  const connect = useCallback((spec: RuntimeSpec) => {
+    setShowConnect(false);
+    abandonExecs();
+    runtime.start(spec, nb?.name);
+  }, [abandonExecs, runtime, nb?.name]);
+
+  // Picked on the Cluster page: start it here, on the notebook you last had open.
+  const hasStore = store !== null;
+  useEffect(() => {
+    if (hasStore && runtime.loaded && runtime.pending) connect(runtime.pending);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasStore, runtime.loaded, runtime.pending]);
+
+  // Notebooks saved before the shared runtime each held their own: keep one, free the rest.
+  const migrated = useRef(false);
+  useEffect(() => {
+    if (!store || !runtime.loaded || migrated.current) return;
+    migrated.current = true;
+    const ids = Array.from(new Set(store.notebooks.map((n) => n.kernelId).filter(Boolean) as string[]));
+    if (!ids.length) return;
+    const keep = runtime.kernelId ?? store.notebooks.find((n) => n.id === store.activeId)?.kernelId ?? ids[0];
+    runtime.adopt(keep);
+    const extra = ids.filter((id) => id !== keep);
+    for (const id of extra) api(base, `/api/v1/kernels/${id}`, { method: "DELETE" }).catch(() => {});
+    if (extra.length) setNotice(`Freed ${extra.length} older runtime${extra.length === 1 ? "" : "s"} held by other notebooks: this browser now keeps one runtime at a time.`);
+    setStore((st) => (st ? { ...st, notebooks: st.notebooks.map((n) => ({ ...n, kernelId: null })) } : st));
+  }, [store, runtime, base]);
 
   // ---------------------------------------------------------------- execution
   const submit = useCallback(async (nbId: string, ids: string[], kernelId: string) => {
@@ -155,18 +158,25 @@ export default function NotebookApp() {
       submit(nb.id, codeIds, kernel.kernel_id);
       return;
     }
-    // Not connected: connect with this notebook's settings, then run (like Colab).
+    // Not connected: queue the cells; they run once a runtime is ready. No runtime yet = pick one.
     pending.current = { nbId: nb.id, ids: codeIds };
     for (const id of codeIds) updateCell(nb.id, id, (c) => ({ ...c, status: "queued", outputs: [] }));
-    if (!kernel || kernel.status === "DEAD" || kernel.status === "ERROR") {
-      runtime.connect(nb.target || "", nb.gpuShare ?? 1, nb.name, nb.cpuCores ?? defaultCores(nb.gpuShare ?? 1)).catch((e) => {
-        runtime.setError(e instanceof Error ? e.message : String(e));
-        // Nothing will run these: put them back to idle instead of leaving them "queued".
-        pending.current = null;
-        for (const id of codeIds) updateCell(nb.id, id, (c) => ({ ...c, status: c.status === "queued" ? "idle" : c.status }));
-      });
-    }
+    if (!runtime.busy) setShowConnect(true);
   }, [nb, kernel, runtime, submit, updateCell]);
+
+  const unqueue = useCallback(() => {
+    const p = pending.current;
+    if (!p) return;
+    pending.current = null;
+    for (const id of p.ids) updateCell(p.nbId, id, (c) => ({ ...c, status: c.status === "queued" ? "idle" : c.status }));
+  }, [updateCell]);
+
+  const release = useCallback(async () => {
+    abandonExecs();
+    unqueue();
+    await runtime.release();
+    setShowConnect(true);
+  }, [abandonExecs, unqueue, runtime]);
 
   // Flush cells queued while the runtime was starting.
   useEffect(() => {
@@ -175,13 +185,11 @@ export default function NotebookApp() {
     if (kernel.status === "READY") {
       pending.current = null;
       submit(p.nbId, p.ids, kernel.kernel_id);
-    } else if (kernel.status === "ERROR" || kernel.status === "DEAD") {
-      pending.current = null;
-      for (const id of p.ids) {
-        updateCell(p.nbId, id, (c) => ({ ...c, status: "error", outputs: [{ output_type: "error", ename: "RuntimeError", evalue: "Could not start the runtime", traceback: kernel.error ?? "The runtime failed to start." }] }));
-      }
     }
-  }, [kernel, submit, updateCell]);
+  }, [kernel, submit]);
+  useEffect(() => {
+    if (runtime.phase === "error") unqueue();   // the progress panel says why
+  }, [runtime.phase, unqueue]);
 
   // Poll running executions and splice their streamed outputs into the cells.
   useEffect(() => {
@@ -278,19 +286,12 @@ export default function NotebookApp() {
     else insertCell(id, "below");
   }, [nb, runCells, focusCell, insertCell]);
 
-  const restart = useCallback(async () => {
-    if (!nb) return;
-    const target = nb.target || "";
-    await runtime.disconnect();
-    updateNb(nb.id, (n) => ({ ...n, cells: n.cells.map((c) => ({ ...c, execCount: c.execCount, status: c.status === "running" || c.status === "queued" ? "cancelled" : c.status })) }));
-    execs.current.clear();
-    try {
-      await runtime.connect(target, nb.gpuShare ?? 1, nb.name, nb.cpuCores ?? defaultCores(nb.gpuShare ?? 1));
-      setNotice("Runtime restarted: all variables were cleared.");
-    } catch (e) {
-      runtime.setError(e instanceof Error ? e.message : String(e));
-    }
-  }, [nb, kernel, runtime, updateNb]);
+  const restart = useCallback(() => {
+    if (!nb || !runtime.spec) return;
+    abandonExecs();
+    runtime.start(runtime.spec, nb.name);
+    setNotice("Restarting the runtime on the same hardware: all variables are cleared.");
+  }, [nb, runtime, abandonExecs]);
 
   const runAll = useCallback((which: "all" | "before" | "after") => {
     if (!nb) return;
@@ -310,10 +311,8 @@ export default function NotebookApp() {
   }, []);
 
   const openSample = useCallback((s: Sample) => {
-    const book = fromPercentPy(s.code, s.title);
-    book.target = nb?.target ?? "";
-    addNotebook(book);
-  }, [addNotebook, nb?.target]);
+    addNotebook(fromPercentPy(s.code, s.title));
+  }, [addNotebook]);
 
   const insertSample = useCallback((s: Sample) => {
     if (!nb) return;
@@ -354,20 +353,20 @@ export default function NotebookApp() {
 
   const runAsJob = useCallback(async () => {
     if (!nb) return;
-    const share = nb.gpuShare ?? 1;
-    if (kernel?.status === "READY" && kernel.num_gpus + share > 1 &&
+    const share = runtime.spec?.gpus ?? 1;
+    if (kernel?.status === "READY" && share > 0 && kernel.num_gpus + share > 1 &&
         !window.confirm("This notebook's runtime still holds its GPU share, so the job waits until you disconnect it. Submit anyway?")) {
       return;
     }
     try {
       const job = await postJson<JobResult>(base, "/api/v1/jobs/submit", {
-        script_code: toScript(nb), target_node_ip: nb.target || null, num_gpus: share, job_name: nb.name,
+        script_code: toScript(nb), target_node_ip: runtime.spec?.ip || null, num_gpus: share, job_name: nb.name,
       });
       router.push(`/jobs?job=${job.job_id}`);
     } catch (e) {
       setNotice(`Job submission failed: ${e instanceof Error ? e.message : String(e)}`);
     }
-  }, [base, nb, kernel, router]);
+  }, [base, nb, kernel, router, runtime.spec]);
 
   // ---------------------------------------------------------------- keyboard (Colab-style Ctrl+M chords)
   const chord = useRef(0);
@@ -403,13 +402,18 @@ export default function NotebookApp() {
 
   // ---------------------------------------------------------------- header resource chip
   const runtimeNode = useMemo(() => {
-    const ip = kernel?.target_node_ip || kernel?.info?.node_ip;
+    const ip = kernel?.target_node_ip || kernel?.info?.node_ip || runtime.spec?.ip;
     if (!ip) return undefined;
     const same = nodes.filter((n) => n.tailscale_ip === ip);
     return same.find((n) => n.gpu_count > 0) ?? same[0];
-  }, [nodes, kernel]);
+  }, [nodes, kernel, runtime.spec?.ip]);
   const runtimeGpu = runtimeNode?.gpus[0];
   const anyRunning = nb?.cells.some((c) => c.status === "running" || c.status === "queued") ?? false;
+  // Where a runtime error shows: start failures in the progress panel, a stopped runtime in the
+  // "No runtime" prompt, anything else (e.g. interrupt failed) in the notice bar.
+  const startFailed = runtime.phase === "error" && runtime.errorKind !== "stopped";
+  const stopped = runtime.phase === "error" && runtime.errorKind === "stopped";
+  const otherError = runtime.error && runtime.phase !== "error" ? runtime.error : null;
 
   if (!store || !nb) return <div className="p-10 text-center text-sm text-muted">Loading notebooks…</div>;
 
@@ -419,29 +423,29 @@ export default function NotebookApp() {
     <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="min-w-0">
         {/* ------------------------------------------------------------ header */}
-        <div className="sticky top-14 z-20 -mx-1 mb-3 rounded-2xl border border-line bg-surface/90 px-3 py-2 backdrop-blur panel-shadow lg:top-3">
+        <div className="sticky top-14 z-20 -mx-1 mb-3 rounded-2xl border border-line glass-border glass px-3 py-2 lg:top-3">
           <div className="flex flex-wrap items-center gap-2">
             {renaming ? (
               <input autoFocus defaultValue={nb.name}
                 onBlur={(e) => { updateNb(nb.id, (n) => ({ ...n, name: e.target.value.trim() || n.name })); setRenaming(false); }}
                 onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                className="w-56 rounded border border-line-strong bg-surface px-2 py-1 text-sm text-fg focus:outline-none" />
+                className="w-56 rounded-lg border border-accent bg-elevated px-2 py-1 text-[15px] font-semibold text-fg focus:outline-none" />
             ) : (
-              <button onClick={() => setRenaming(true)} title="Rename" className="max-w-[18rem] truncate rounded px-1.5 py-1 text-sm font-semibold text-fg hover:bg-elevated">
+              <button onClick={() => setRenaming(true)} title="Rename" className="max-w-[18rem] truncate rounded-lg px-2 py-1 text-[15px] font-semibold text-fg transition-colors duration-150 hover:bg-elevated">
                 {nb.name}
               </button>
             )}
             <select value={nb.id} onChange={(e) => setStore((s) => (s ? { ...s, activeId: e.target.value } : s))}
-              className="max-w-[12rem] rounded border border-line-strong bg-surface px-2 py-1 text-xs text-fg/85" aria-label="Switch notebook">
+              className="max-w-[12rem] rounded-lg border border-line bg-elevated px-2 py-1.5 text-[12.5px] text-fg/90 transition-colors duration-150 hover:border-line-strong" aria-label="Switch notebook">
               {store.notebooks.map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}
             </select>
-            <Button variant="ghost" onClick={() => addNotebook(newNotebook())}>New</Button>
-            <Button variant="ghost" onClick={() => fileInput.current?.click()} title="Open a .ipynb (Colab/Jupyter) or .py file">Import</Button>
-            <Button variant="ghost" onClick={() => download(`${safeName}.ipynb`, toIpynb(nb))} title="Download as .ipynb (opens in Colab/Jupyter)">Export .ipynb</Button>
-            <Button variant="ghost" onClick={() => download(`${safeName}.py`, toPercentPy(nb), "text/x-python")}>Export .py</Button>
-            <Button variant="ghost" onClick={() => {
+            <ToolGroup label="Notebook files">
+            <Button variant="ghost" className={TOOL} onClick={() => addNotebook(newNotebook())}>New</Button>
+            <Button variant="ghost" className={TOOL} onClick={() => fileInput.current?.click()} title="Open a .ipynb (Colab/Jupyter) or .py file">Import</Button>
+            <Button variant="ghost" className={TOOL} onClick={() => download(`${safeName}.ipynb`, toIpynb(nb))} title="Download as .ipynb (opens in Colab/Jupyter)">Export .ipynb</Button>
+            <Button variant="ghost" className={TOOL} onClick={() => download(`${safeName}.py`, toPercentPy(nb), "text/x-python")}>Export .py</Button>
+            <Button variant="ghost" className={TOOL} onClick={() => {
               if (window.confirm(`Delete notebook "${nb.name}"? This cannot be undone.`)) {
-                if (kernel?.status === "READY") runtime.disconnect();
                 setStore((s) => {
                   if (!s) return s;
                   const rest = s.notebooks.filter((n) => n.id !== nb.id);
@@ -450,49 +454,80 @@ export default function NotebookApp() {
                 });
               }
             }}>Delete</Button>
+            </ToolGroup>
             <input ref={fileInput} type="file" accept=".ipynb,.py" className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) importFile(f); e.target.value = ""; }} />
 
             {/* runtime chip */}
             <div className="ml-auto flex items-center gap-2">
               {kernel && <StatusPill status={kernel.status} />}
-              {kernel?.status === "READY" && runtimeGpu && (
-                <button onClick={() => setShowConnect(true)} className="hidden items-center gap-2 rounded-lg border border-line px-2 py-1 text-[11px] text-fg/85 hover:border-line-strong lg:flex"
-                  title="Live GPU telemetry of the connected worker">
-                  <span className="max-w-[10rem] truncate">{runtimeGpu.name.replace("NVIDIA GeForce ", "")} · {runtimeNode?.hostname}</span>
-                  <MiniBar label="GPU" value={runtimeGpu.gpu_utilization_pct} />
-                  <MiniBar label="VRAM" value={pct(runtimeGpu.used_vram_mb, runtimeGpu.total_vram_mb)} title={`${fmtMB(runtimeGpu.used_vram_mb)} / ${fmtMB(runtimeGpu.total_vram_mb)}`} />
-                </button>
+              {runtime.ready && runtime.spec && (
+                <span className="hidden items-center gap-2 rounded-lg border border-line px-2 py-1 text-[11px] text-fg/85 lg:flex"
+                  title="The runtime this notebook uses, with live telemetry of its PC">
+                  <span className="max-w-[16rem] truncate">{runtime.spec.hostname} · {describeSpec(runtime.spec, runtime.spec.gpus > 0 ? runtimeGpu?.name : null)}</span>
+                  {runtime.spec.gpus > 0 && runtimeGpu ? (
+                    <>
+                      <MiniBar label="GPU" value={runtimeGpu.gpu_utilization_pct} />
+                      <MiniBar label="VRAM" value={pct(runtimeGpu.used_vram_mb, runtimeGpu.total_vram_mb)} title={`${fmtMB(runtimeGpu.used_vram_mb)} / ${fmtMB(runtimeGpu.total_vram_mb)}`} />
+                    </>
+                  ) : runtimeNode ? (
+                    <MiniBar label="CPU" value={runtimeNode.host.cpu_utilization_pct} />
+                  ) : null}
+                </span>
               )}
-              {kernel?.status === "READY" || kernel?.status === "STARTING" ? (
-                <Button onClick={() => runtime.disconnect()} title="Stop the runtime and free its GPU share">Disconnect</Button>
+              {runtime.kernelId || runtime.busy ? (
+                <Button onClick={release} title="Stop the runtime and free its GPU seats and CPU cores">Disconnect &amp; release</Button>
               ) : (
                 <Button variant="primary" onClick={() => setShowConnect(true)}>Connect</Button>
               )}
             </div>
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-line/80 pt-2">
-            <Button onClick={() => insertCell(activeCell, "below", "code")}>+ Code</Button>
-            <Button onClick={() => insertCell(activeCell, "below", "markdown")}>+ Text</Button>
-            <span className="mx-1 h-4 w-px bg-elevated" />
-            <Button onClick={() => runAll("all")} title="Run every cell from the top"><IconJobs size={14} /> Run all</Button>
-            <Button variant="ghost" onClick={() => runAll("before")} disabled={!activeCell}>Run before</Button>
-            <Button variant="ghost" onClick={() => runAll("after")} disabled={!activeCell}>Run selected & after</Button>
-            <Button variant="ghost" onClick={() => runtime.interrupt()} disabled={!anyRunning} title="Ctrl+M I"><IconStop size={13} /> Interrupt</Button>
-            <Button variant="ghost" onClick={restart} disabled={!kernel || kernel.status !== "READY"} title="Clears all variables (Ctrl+M .)"><IconRefresh size={14} /> Restart</Button>
-            <Button variant="ghost" onClick={clearOutputs}>Clear outputs</Button>
-            <span className="mx-1 h-4 w-px bg-elevated" />
-            <Button variant="ghost" onClick={runAsJob} title="Submit all code cells as one batch job (Jobs page)">Run as batch job</Button>
-            <span className="ml-auto text-[11px] text-muted">
-              {nb.target ? `target ${nb.target}` : "any GPU"} · share {nb.gpuShare ?? 1}
+          <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-line/80 pt-2">
+            <ToolGroup label="Add cells">
+              <Button variant="ghost" className={TOOL} onClick={() => insertCell(activeCell, "below", "code")}>+ Code</Button>
+              <Button variant="ghost" className={TOOL} onClick={() => insertCell(activeCell, "below", "markdown")}>+ Text</Button>
+            </ToolGroup>
+            <ToolGroup label="Run cells">
+              <Button variant="ghost" className={`${TOOL} font-semibold`} onClick={() => runAll("all")} title="Run every cell from the top"><IconJobs size={14} /> Run all</Button>
+              <Button variant="ghost" className={TOOL} onClick={() => runAll("before")} disabled={!activeCell}>Run before</Button>
+              <Button variant="ghost" className={TOOL} onClick={() => runAll("after")} disabled={!activeCell}>Run selected & after</Button>
+            </ToolGroup>
+            <ToolGroup label="Runtime control">
+              <Button variant="ghost" className={TOOL} onClick={() => runtime.interrupt()} disabled={!anyRunning} title="Ctrl+M I"><IconStop size={13} /> Interrupt</Button>
+              <Button variant="ghost" className={TOOL} onClick={restart} disabled={!kernel || kernel.status !== "READY"} title="Clears all variables (Ctrl+M .)"><IconRefresh size={14} /> Restart</Button>
+              <Button variant="ghost" className={TOOL} onClick={clearOutputs}>Clear outputs</Button>
+            </ToolGroup>
+            <ToolGroup label="Batch">
+              <Button variant="ghost" className={TOOL} onClick={runAsJob} title="Submit all code cells as one batch job (Jobs page)">Run as batch job</Button>
+            </ToolGroup>
+            <span className="ml-auto text-[12px] text-muted">
+              {runtime.kernelId && runtime.spec ? `${runtime.spec.hostname} · ${describeSpec(runtime.spec)}` : "No runtime"}
             </span>
           </div>
         </div>
 
-        {(notice || runtime.error) && (
+        {(runtime.busy || startFailed) && (
+          <RuntimeProgress phase={runtime.phase} spec={runtime.spec} error={runtime.error} startedAt={runtime.startedAt}
+            failedAfterAccept={runtime.errorKind === "failed"}
+            onCancel={() => { unqueue(); runtime.release(); }}
+            onRetry={() => runtime.spec && connect(runtime.spec)}
+            onPickOther={() => { runtime.setError(null); setShowConnect(true); }} />
+        )}
+
+        {runtime.loaded && !runtime.kernelId && !runtime.busy && !startFailed && (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-line-strong bg-surface/70 px-4 py-3">
+            <div className="text-[13px]">
+              <div className={`font-semibold ${stopped ? "text-warn-fg" : "text-fg"}`}>{stopped ? runtime.error : "No runtime connected"}</div>
+              <div className="text-muted">Pick GPU seats for a GPU runtime, or only CPU cores for a CPU runtime. Cells you run wait for it.</div>
+            </div>
+            <Button variant="primary" onClick={() => { runtime.setError(null); setShowConnect(true); }}>Connect</Button>
+          </div>
+        )}
+
+        {(notice || otherError) && (
           <div className="mb-3 flex items-start justify-between gap-3 rounded-lg border border-line-strong bg-surface px-3 py-2 text-xs text-fg/85">
-            <span className={runtime.error ? "text-danger-fg" : ""}>{runtime.error ?? notice}</span>
-            <button onClick={() => { setNotice(null); runtime.setError(null); }} className="text-muted hover:text-fg" aria-label="Dismiss"><IconClose size={14} /></button>
+            <span className={otherError ? "text-danger-fg" : ""}>{otherError ?? notice}</span>
+            <button onClick={() => { setNotice(null); if (otherError) runtime.setError(null); }} className="text-muted hover:text-fg" aria-label="Dismiss"><IconClose size={14} /></button>
           </div>
         )}
 
@@ -527,14 +562,18 @@ export default function NotebookApp() {
       </div>
 
       {showConnect && (
-        <ConnectDialog initialTarget={nb.target ?? ""} initialShare={nb.gpuShare ?? 1}
-          initialCores={nb.cpuCores ?? defaultCores(nb.gpuShare ?? 1)}
-          onClose={() => setShowConnect(false)}
-          onConnect={(t, s, c) => { setShowConnect(false); connect(t, s, c); }} />
+        <ConnectDialog onConnect={connect}
+          onClose={() => { setShowConnect(false); if (!runtime.busy && !runtime.ready) unqueue(); }} />
       )}
     </div>
     </main>
   );
+}
+
+/** Layout-only: a bordered cluster of related toolbar buttons. */
+const TOOL = "min-h-[30px] px-2.5 text-[12.5px]";
+function ToolGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return <div role="group" aria-label={label} className="inline-flex flex-wrap items-center gap-0.5 rounded-lg border border-line bg-elevated/60 p-0.5">{children}</div>;
 }
 
 function MiniBar({ label, value, title }: { label: string; value: number; title?: string }) {

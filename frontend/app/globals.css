@@ -10,12 +10,13 @@
    The theme is chosen by data-theme on <html>, set before first paint by the inline script
    in app/layout.tsx (lib/theme.tsx).
 
-   60-30-10: canvas/surface/elevated (60) · text, lines, seat states (30) · amber accent (10:
-   primary actions and selected resources only).
+   Dark = "Dark Emerald" (amber accent). Light = "Cloud & Cobalt" (cobalt accent).
+   60-30-10: canvas/surface/elevated (60) · text, lines, seat states (30) · accent (10: primary
+   actions, selected seats, focus only). Availability and success stay green in both themes.
 
-   Contrast adjustments to the brief's palette (WCAG AA for small text):
-     light muted   #657A6E -> #586D61   (#657A6E is 3.9:1 on the sage cards)
-     light warn/danger keep their brief values as fills; text uses darker *-fg steps.
+   Contrast adjustments to the Cloud & Cobalt palette (WCAG AA for small text):
+     light muted   #65748B -> #5B6A80   (#65748B is 4.1:1 on the #E9EEF5 cards)
+     light ok/warn/danger keep the brief's values as fills; text uses darker *-fg steps.
    ========================================================================================= */
 
 :root,
@@ -32,6 +33,8 @@
   --accent-hover: 255 214 112;
   --accent-fg: 9 24 21;         /* text on amber */
   --accent-edge: 255 200 61;    /* outline of a selected seat */
+  --accent-soft: 23 51 43;      /* active navigation item (elevated at 80% on the sidebar) */
+  --sidebar: 14 33 29;          /* sidebar (surface over canvas) */
   --seat-free: 184 216 201;     /* #B8D8C9 available GPU */
   --seat-taken: 49 87 75;       /* #31574B taken GPU */
   --seat-offline: 82 100 93;    /* #52645D offline GPU */
@@ -42,6 +45,7 @@
   --danger: 241 109 109;        /* #F16D6D */
   --danger-fg: 241 109 109;
   --viz: 142 216 181;           /* chart series */
+  --icon: 142 216 181;          /* section and machine icons (muted mint) */
   --glow: 36 105 78;            /* background radial glow */
   --grid-line: 184 216 201;
   --grid-alpha: 0.045;
@@ -57,45 +61,107 @@
   --syn-function: 232 241 237;
   --syn-def: 184 216 201;
   --syn-builtin: 150 200 235;
+  /* Glass: translucent versions of the surfaces above (palette unchanged), frosted. */
+  /* level 2 = cards, level 3 = elevated (dialogs, panels): brighter, finer, more highlight */
+  --glass-alpha: 0.70;
+  --glass-alpha-elevated: 0.68;
+  --glass-sidebar-alpha: 0.66;
+  --glass-blur: 18px;
+  --glass-sat: 135%;
+  --glass-edge: 190 225 210;          /* fine translucent green-grey border */
+  --glass-edge-alpha: 0.13;
+  --glass-highlight: rgb(220 255 240 / 0.06);
+  --glass-highlight-strong: rgb(220 255 240 / 0.09);
+  --glass-ring: rgb(220 255 240 / 0.025);
+  --glass-sheen: rgb(220 255 240 / 0.035);
+  --glass-sheen-strong: rgb(220 255 240 / 0.05);
+  --glass-shadow: 0 8px 28px rgb(0 0 0 / 0.16);
+  --glass-shadow-elevated: 0 14px 40px rgb(0 0 0 / 0.26);
+  --reflect: rgb(142 216 181 / 0.035);  /* faint emerald reflection on the backdrop */
+  /* Ambient light behind the content, so the glass has something to frost */
+  --amb: 46 140 102;                  /* deep emerald, never neon */
+  --amb-center: 0.15;
+  --amb-side: 0.10;
+  --vignette: rgb(0 0 0 / 0.22);
+  /* KPI icon tints: icon colour + chip surface */
+  --kpi-seats: 120 220 165;  --kpi-seats-bg: 79 209 139;
+  --kpi-nodes: 140 170 255;  --kpi-nodes-bg: 110 145 245;
+  --kpi-jobs: 176 164 255;   --kpi-jobs-bg: 140 125 240;
+  --kpi-util: 110 214 210;   --kpi-util-bg: 70 190 185;
+  --kpi-chip-alpha: 0.14;
+  /* Sun/moon dial */
+  --dial-sun: 255 200 61;
+  --dial-moon: 184 216 201;
+  --dial-glow: 79 209 139;            /* cool emerald */
 }
 
 [data-theme="light"] {
   color-scheme: light;
-  --canvas: 244 248 245;        /* #F4F8F5 */
-  --surface: 229 239 233;       /* #E5EFE9 */
-  --elevated: 255 255 255;      /* #FFFFFF */
-  --line: 209 222 213;          /* #D1DED5 */
-  --line-strong: 170 191 179;
-  --fg: 27 48 39;               /* #1B3027 */
-  --muted: 88 109 97;           /* #586D61 (AA on every surface) */
-  --accent: 242 189 66;         /* #F2BD42 */
-  --accent-hover: 236 174 30;
-  --accent-fg: 27 48 39;
-  --accent-edge: 176 128 12;    /* gives the amber seat a 3:1 edge on light grounds */
-  --seat-free: 38 130 95;       /* #26825F */
-  --seat-taken: 175 203 190;    /* #AFCBBE */
-  --seat-offline: 184 197 190;  /* #B8C5BE */
-  --ok: 38 130 95;
-  --ok-fg: 29 110 79;
-  --warn: 185 106 23;           /* #B96A17 */
-  --warn-fg: 150 82 14;
-  --danger: 201 76 76;          /* #C94C4C */
-  --danger-fg: 176 58 58;
-  --viz: 38 130 95;
-  --glow: 160 199 178;
-  --grid-line: 27 48 39;
-  --grid-alpha: 0.04;
-  --glow-alpha: 0.28;
-  --noise-alpha: 0.035;
-  --shadow: 27 48 39;
-  --shadow-alpha: 0.12;
-  --syn-keyword: 150 82 14;
-  --syn-string: 29 110 79;
-  --syn-number: 176 58 58;
-  --syn-comment: 105 124 113;
-  --syn-function: 27 48 39;
-  --syn-def: 30 92 120;
-  --syn-builtin: 40 90 150;
+  --canvas: 245 247 251;        /* #F5F7FB main background */
+  --surface: 233 238 245;       /* #E9EEF5 standard cards */
+  --elevated: 255 255 255;      /* #FFFFFF elevated cards, rows, secondary buttons */
+  --line: 216 224 235;          /* #D8E0EB borders */
+  --line-strong: 185 197 214;
+  --fg: 23 37 58;               /* #17253A navy text */
+  --muted: 91 106 128;          /* #5B6A80 secondary text (AA on every surface) */
+  --accent: 69 102 232;         /* #4566E8 cobalt */
+  --accent-hover: 56 89 212;    /* #3859D4 */
+  --accent-fg: 255 255 255;
+  --accent-edge: 52 86 217;     /* #3456D9 */
+  --accent-soft: 229 235 255;   /* #E5EBFF */
+  --sidebar: 238 242 249;       /* #EEF2F9 */
+  --seat-free: 22 133 104;      /* #168568 */
+  --seat-taken: 183 197 215;    /* #B7C5D7 */
+  --seat-offline: 170 180 194;  /* #AAB4C2 */
+  --ok: 22 133 104;             /* #168568 */
+  --ok-fg: 17 112 87;
+  --warn: 217 145 50;           /* #D99132 */
+  --warn-fg: 150 92 16;
+  --danger: 217 76 88;          /* #D94C58 */
+  --danger-fg: 184 54 66;
+  --viz: 69 102 232;            /* charts: cobalt series */
+  --icon: 69 102 232;           /* section and machine icons (cobalt) */
+  --glow: 69 102 232;
+  --grid-line: 52 76 120;
+  --grid-alpha: 0.045;
+  --glow-alpha: 0.07;
+  --noise-alpha: 0.02;
+  --shadow: 23 37 58;
+  --shadow-alpha: 0.10;
+  --syn-keyword: 52 86 217;
+  --syn-string: 17 112 87;
+  --syn-number: 184 54 66;
+  --syn-comment: 120 133 152;
+  --syn-function: 23 37 58;
+  --syn-def: 32 84 160;
+  --syn-builtin: 150 92 16;
+  --glass-alpha: 0.62;
+  --glass-alpha-elevated: 0.70;
+  --glass-sidebar-alpha: 0.60;
+  --glass-blur: 18px;
+  --glass-sat: 145%;
+  --glass-edge: 216 224 235;          /* #D8E0EB: cards still need their edge on near-white */
+  --glass-edge-alpha: 0.9;
+  --glass-highlight: rgb(255 255 255 / 0.85);
+  --glass-highlight-strong: rgb(255 255 255 / 0.95);
+  --glass-ring: rgb(255 255 255 / 0.5);    /* fine white rim inside the border */
+  --glass-sheen: rgb(255 255 255 / 0.32);
+  --glass-sheen-strong: rgb(255 255 255 / 0.45);
+  --glass-shadow: 0 6px 24px rgb(35 55 90 / 0.07);
+  --glass-shadow-elevated: 0 14px 40px rgb(35 55 90 / 0.12);
+  --reflect: rgb(255 255 255 / 0.55);   /* soft white reflection on the backdrop */
+  --amb: 69 102 232;                  /* cobalt */
+  --amb-center: 0.085;
+  --amb-side: 0.06;
+  --vignette: transparent;
+  --kpi-seats: 22 133 104;   --kpi-seats-bg: 22 133 104;   /* emerald */
+  --kpi-nodes: 69 102 232;   --kpi-nodes-bg: 69 102 232;   /* cobalt */
+  --kpi-jobs: 91 79 214;     --kpi-jobs-bg: 91 79 214;     /* indigo */
+  --kpi-util: 13 128 140;    --kpi-util-bg: 13 128 140;    /* teal */
+  --kpi-chip-alpha: 0.10;
+  --dial-sun: 217 145 50;            /* warm amber */
+  --dial-moon: 101 116 139;
+  --dial-glow: 245 170 60;
 }
 
 /* ---------------------------------------------------------------- base */
@@ -119,6 +185,9 @@ body {
   outline: 2px solid rgb(var(--accent));
   outline-offset: 2px;
 }
+[data-theme="light"] :focus-visible {
+  box-shadow: 0 0 0 4px rgb(69 102 232 / 0.25);   /* the brief's cobalt focus ring */
+}
 .tabular,
 td,
 th {
@@ -134,8 +203,15 @@ th {
   z-index: -1;
   pointer-events: none;
   background:
+    radial-gradient(700px 420px at 72% -8%, var(--reflect), transparent 70%),
+    /* behind the main content (KPI cards, seat map) */
+    radial-gradient(820px 520px at 48% 30%, rgb(var(--amb) / var(--amb-center)), transparent 70%),
+    /* depth near the sidebar and the right panel */
+    radial-gradient(460px 760px at 4% 72%, rgb(var(--amb) / var(--amb-side)), transparent 70%),
+    radial-gradient(560px 820px at 98% 58%, rgb(var(--amb) / var(--amb-side)), transparent 70%),
     radial-gradient(1100px 620px at 18% -12%, rgb(var(--glow) / var(--glow-alpha)), transparent 70%),
     radial-gradient(900px 560px at 100% 4%, rgb(var(--glow) / calc(var(--glow-alpha) * 0.7)), transparent 72%),
+    linear-gradient(to bottom, transparent 55%, var(--vignette)),
     rgb(var(--canvas));
 }
 .app-backdrop::before {
@@ -158,6 +234,49 @@ th {
   mix-blend-mode: overlay;
 }
 
+/* ---------------------------------------------------------------- glass
+   Frosted, translucent versions of the theme's own surfaces. Text-heavy areas (code editors,
+   outputs, inputs) stay opaque; seats are never glass. Without backdrop-filter the surfaces
+   fall back to their solid colours. */
+.glass,
+.glass-elevated,
+.glass-sidebar {
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  /* soft ambient shadow, top-edge highlight, and a hairline rim inside the border */
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight), inset 0 0 0 1px var(--glass-ring);
+}
+/* Opt-in fine translucent edge (components with their own accent border keep it). */
+.glass-border { border-color: rgb(var(--glass-edge) / var(--glass-edge-alpha)); }
+/* Level 2: standard glass (cards, panels). The sheen is a faint reflection across the top. */
+.glass {
+  background-color: rgb(var(--surface) / var(--glass-alpha));
+  background-image: linear-gradient(180deg, var(--glass-sheen), transparent 46%);
+}
+/* Level 3: elevated glass (dialogs, contextual panels, tooltips): brighter, stronger rim. */
+.glass-elevated {
+  background-color: rgb(var(--elevated) / var(--glass-alpha-elevated));
+  background-image: linear-gradient(180deg, var(--glass-sheen-strong), transparent 55%);
+  box-shadow: var(--glass-shadow-elevated), inset 0 1px 0 var(--glass-highlight-strong), inset 0 0 0 1px var(--glass-ring);
+}
+.glass-sidebar {
+  background-color: rgb(var(--sidebar) / var(--glass-sidebar-alpha));
+  background-image: linear-gradient(180deg, var(--glass-sheen), transparent 30%);
+  box-shadow: inset -1px 0 0 var(--glass-highlight);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass { background-color: rgb(var(--surface)); background-image: none; }
+  .glass-elevated { background-color: rgb(var(--elevated)); background-image: none; }
+  .glass-sidebar { background-color: rgb(var(--sidebar)); background-image: none; }
+}
+
+/* KPI icon chips */
+.kpi-chip { color: rgb(var(--tone)); background: rgb(var(--tone-bg) / var(--kpi-chip-alpha)); box-shadow: inset 0 0 0 1px rgb(var(--tone-bg) / calc(var(--kpi-chip-alpha) * 1.2)); }
+.kpi-seats { --tone: var(--kpi-seats); --tone-bg: var(--kpi-seats-bg); }
+.kpi-nodes { --tone: var(--kpi-nodes); --tone-bg: var(--kpi-nodes-bg); }
+.kpi-jobs { --tone: var(--kpi-jobs); --tone-bg: var(--kpi-jobs-bg); }
+.kpi-util { --tone: var(--kpi-util); --tone-bg: var(--kpi-util-bg); }
+
 /* ---------------------------------------------------------------- surfaces */
 .panel-shadow {
   box-shadow: 0 1px 0 rgb(var(--fg) / 0.03) inset, 0 12px 32px -20px rgb(var(--shadow) / var(--shadow-alpha));
@@ -171,7 +290,7 @@ th {
 .seat {
   position: relative;
   width: 34px;
-  height: 30px;
+  height: 32px;
   border-radius: 10px 10px 5px 5px;
   border: 2px solid transparent;
   display: grid;
@@ -213,26 +332,108 @@ th {
   color: rgb(var(--seat-offline));
   cursor: not-allowed;
 }
+[data-theme="light"] .seat[data-state="free"] {
+  background: rgb(255 255 255);
+}
+/* CPU core seats: smaller and square, same states. */
+.seat[data-kind="core"] {
+  width: 20px;
+  height: 20px;
+  border-width: 1.5px;
+  border-radius: 5px;
+}
+.seat[data-kind="core"][data-state="selected"] {
+  box-shadow: 0 0 0 2px rgb(var(--accent) / 0.22);
+}
+.seat[data-kind="core"][data-state="taken"]::after {
+  content: "";
+  width: 6px;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+}
 @keyframes seat-pop {
   0% { transform: scale(1); }
   45% { transform: scale(1.12); }
   100% { transform: scale(1.04); }
 }
 
-/* ---------------------------------------------------------------- theme toggle icon */
-.theme-icon {
-  transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1), opacity 260ms ease;
+/* ---------------------------------------------------------------- sun/moon dial
+   A pill with both icons; a knob slides under the active one (300 ms), the incoming icon turns
+   into place (300 ms) and its glow fades in (200 ms). components/ThemeToggle.tsx. */
+.theme-dial {
+  --dial-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  width: 72px;
+  height: 38px;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--glass-edge) / var(--glass-edge-alpha));
+  background: rgb(var(--surface) / 0.55);
+  -webkit-backdrop-filter: blur(12px) saturate(var(--glass-sat));
+  backdrop-filter: blur(12px) saturate(var(--glass-sat));
+  /* recessed track: inner shadow + a highlight on the lower lip, like a machined groove */
+  box-shadow: inset 0 1px 3px rgb(var(--shadow) / calc(var(--shadow-alpha) * 1.1)), inset 0 -1px 0 var(--glass-highlight), 0 1px 0 var(--glass-highlight);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
-[data-theme="dark"] .theme-icon-sun,
-[data-theme="light"] .theme-icon-moon {
-  opacity: 0;
-  transform: rotate(-90deg) scale(0.5);
+.theme-dial:hover { border-color: rgb(var(--line-strong)); }
+.theme-dial:disabled { cursor: wait; }
+.theme-dial-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 32px;
+  height: 30px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--glass-sheen-strong), transparent 70%), rgb(var(--elevated));
+  border: 1px solid rgb(var(--dial-glow) / 0.35);
+  /* the active knob carries the theme's glow, so the selection reads at a glance */
+  box-shadow: 0 2px 7px rgb(var(--shadow) / calc(var(--shadow-alpha) * 1.3)), 0 0 12px rgb(var(--dial-glow) / 0.28), inset 0 1px 0 var(--glass-highlight-strong);
+  will-change: transform;
+  transition: transform 300ms var(--dial-ease), box-shadow 150ms ease, border-color 200ms ease;
 }
+[data-theme="dark"] .theme-dial-knob { transform: translateX(32px); }
+.theme-dial-icon {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  height: 30px;
+  color: rgb(var(--muted) / 0.7);
+  transition: color 200ms ease, opacity 200ms ease, transform 300ms var(--dial-ease), filter 200ms ease;
+}
+.theme-dial-icon[data-icon="sun"] { transform: rotate(-45deg) scale(0.86); }
+.theme-dial-icon[data-icon="moon"] { transform: rotate(-30deg) scale(0.86); }
+[data-theme="light"] .theme-dial-icon[data-icon="sun"],
+[data-theme="dark"] .theme-dial-icon[data-icon="moon"] {
+  transform: none;
+}
+[data-theme="light"] .theme-dial-icon[data-icon="sun"] {
+  color: rgb(var(--dial-sun));
+  filter: drop-shadow(0 0 3px rgb(var(--dial-glow) / 0.7)) drop-shadow(0 0 8px rgb(var(--dial-glow) / 0.4));
+}
+[data-theme="dark"] .theme-dial-icon[data-icon="moon"] {
+  color: rgb(var(--dial-moon));
+  filter: drop-shadow(0 0 3px rgb(var(--dial-glow) / 0.55)) drop-shadow(0 0 8px rgb(var(--dial-glow) / 0.3));
+}
+.theme-dial:hover .theme-dial-knob {
+  border-color: rgb(var(--dial-glow) / 0.5);
+  box-shadow: 0 3px 9px rgb(var(--shadow) / calc(var(--shadow-alpha) * 1.5)), 0 0 16px rgb(var(--dial-glow) / 0.38), inset 0 1px 0 var(--glass-highlight-strong);
+}
+.theme-dial:hover .theme-dial-icon { opacity: 1; }
+.theme-dial-icon { opacity: 0.8; }
+[data-theme="light"] .theme-dial-icon[data-icon="sun"],
+[data-theme="dark"] .theme-dial-icon[data-icon="moon"] { opacity: 1; }
 
 /* ---------------------------------------------------------------- ink-bleed theme transition
    lib/inkTransition.ts drives the clip-path; these rules switch off the default cross-fade and
-   order the two snapshots. Forward (dark -> light): the new theme spreads on top. Reverse
-   (light -> dark): the old theme's ink retracts into the toggle, revealing the new one. */
+   order the two snapshots. Forward (light -> dark): Dark Emerald ink spreads from the dial.
+   Reverse (dark -> light): that ink retracts into the dial, revealing Cloud & Cobalt.
+   The clicked dial is its own transition group, drawn live above the ink, so its knob and
+   icons animate as part of the same interaction. */
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;
@@ -251,6 +452,9 @@ html[data-ink="fade"]::view-transition-old(root) {
 html[data-ink="fade"]::view-transition-new(root) {
   animation: ink-fade-in 160ms ease both;
 }
+::view-transition-group(theme-dial) { z-index: 10; animation: none; }
+::view-transition-old(theme-dial) { display: none; }
+::view-transition-new(theme-dial) { animation: none; }
 @keyframes ink-fade-out { to { opacity: 0; } }
 @keyframes ink-fade-in { from { opacity: 0; } }
 
@@ -293,6 +497,7 @@ html[data-ink="fade"]::view-transition-new(root) {
 
 /* ---------------------------------------------------------------- motion preferences */
 @media (prefers-reduced-motion: reduce) {
+  .theme-dial, .theme-dial-knob, .theme-dial-icon { transition-duration: 0ms !important; }
   *,
   *::before,
   *::after {
